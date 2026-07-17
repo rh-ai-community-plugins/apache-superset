@@ -39,7 +39,7 @@ postgres:
     tag: "latest"
     pullPolicy: IfNotPresent
   # password: PostgreSQL password for the 'superset' database user.
-  # CONSTRAINT: must contain only alphanumeric characters (A–Z, a–z, 0–9).
+  # CONSTRAINT: must contain only alphanumeric characters (A-Z, a-z, 0-9).
   # The password is interpolated directly into the SQLAlchemy connection URI
   # (postgresql+psycopg2://user:PASSWORD@host/db) without URL-encoding.
   # Characters such as @, :, /, %, and # will make the URI malformed and
