@@ -99,8 +99,8 @@ bff/
   tsconfig.json
   Containerfile             # UBI9 Node 22, runs on port 3000
   src/
-    server.ts               # Express app with health check + Superset routes
-    types.ts                # Shared types (SupersetStatus, GuestTokenResponse, etc.)
+    server.ts               # Express app with health check (Superset routes added per phase)
+    types.ts                # Shared types (K8sMetadata, K8sResource, K8sList; Superset types added per phase)
     routes/
       superset/             # Superset-specific route handlers (added per phase)
         deploy.ts           # POST/DELETE /api/superset/deploy — lifecycle management
