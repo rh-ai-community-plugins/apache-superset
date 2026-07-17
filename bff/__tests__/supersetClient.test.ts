@@ -67,6 +67,22 @@ describe('SupersetClient', () => {
         'Superset API returned 401 on POST /api/v1/security/login',
       );
     });
+
+    it('concurrent calls share a single in-flight login request', async () => {
+      setupMockRequest(200, JSON.stringify({ access_token: 'jwt-token-concurrent' }));
+
+      const [token1, token2, token3] = await Promise.all([
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken(),
+      ]);
+
+      expect(token1).toBe('jwt-token-concurrent');
+      expect(token2).toBe('jwt-token-concurrent');
+      expect(token3).toBe('jwt-token-concurrent');
+      // Only one login request should have been made despite three concurrent calls
+      expect(mockedHttp.request).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('generateGuestToken', () => {
