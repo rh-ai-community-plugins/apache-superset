@@ -84,10 +84,10 @@ export class SupersetClient {
   }
 
   /**
-   * Makes an authenticated request using the cached access token. On a 401
-   * response the cached token and any in-flight login promise are cleared and
-   * the request is retried once with a fresh token. If the retry also returns
-   * 401 the error is propagated to the caller.
+   * Superset JWTs may be revoked server-side (e.g. server restart, explicit
+   * revocation) before the client-side TTL expires, causing stale-cache 401s.
+   * This wrapper detects those 401s, discards the stale token, and retries
+   * once so callers recover transparently without manual cache management.
    */
   private async authenticatedRequest<T>(
     method: string,
