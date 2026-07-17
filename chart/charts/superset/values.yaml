@@ -44,6 +44,7 @@ postgres:
   persistence:
     size: 5Gi
     storageClass: ""
+    keepOnUninstall: true
   resources:
     requests:
       cpu: 250m
