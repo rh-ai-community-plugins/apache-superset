@@ -7,9 +7,13 @@ superset
 
 {{/*
 Fully qualified name — scoped to the release.
+Capped at 41 characters so that appending the longest compound suffix
+("-postgres-svc", 13 chars) always stays within the Kubernetes 63-char
+limit AND the "-postgres" discriminator is never silently stripped by the
+trunc 50 in superset.postgres.fullname (41 + 9 = 50 exactly).
 */}}
 {{- define "superset.fullname" -}}
-{{- printf "%s-superset" .Release.Name | trunc 50 | trimSuffix "-" }}
+{{- printf "%s-superset" .Release.Name | trunc 41 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
