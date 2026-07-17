@@ -5,10 +5,15 @@ import { K8sResource, HelmRenderContext, HelmChartMeta } from '../types';
 
 const DEFAULT_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
 
+export interface HelmRenderResult {
+  resources: K8sResource[];
+  warnings: string[];
+}
+
 export function renderHelmTemplates(
   context: HelmRenderContext,
   chartDir: string = DEFAULT_CHART_DIR,
-): K8sResource[] {
+): HelmRenderResult {
   const resolved = path.resolve(chartDir);
   const repoChartDir = path.resolve(__dirname, '../../../chart/charts');
   if (!resolved.startsWith(repoChartDir + path.sep)) {
@@ -26,11 +31,12 @@ export function renderHelmTemplates(
     .sort();
 
   const resources: K8sResource[] = [];
+  const warnings: string[] = [];
 
   for (const file of templateFiles) {
     const templatePath = path.join(templatesDir, file);
     const raw = fs.readFileSync(templatePath, 'utf8');
-    const rendered = renderTemplate(raw, helpers, values, context, chartMeta);
+    const rendered = renderTemplate(raw, helpers, values, context, chartMeta, warnings);
     if (!rendered.trim()) continue;
 
     const docs = rendered.split(/^---\s*$/m).filter((d) => d.trim());
@@ -43,13 +49,14 @@ export function renderHelmTemplates(
           }
           resources.push(parsed);
         }
-      } catch {
-        // Skip unparseable documents
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        warnings.push(`Failed to parse YAML document in ${file}: ${message}`);
       }
     }
   }
 
-  return resources;
+  return { resources, warnings };
 }
 
 function loadChartMeta(chartDir: string): HelmChartMeta {
@@ -193,6 +200,7 @@ function renderTemplate(
   values: Record<string, unknown>,
   context: HelmRenderContext,
   chartMeta: HelmChartMeta,
+  warnings: string[],
 ): string {
   let result = template;
 
@@ -227,7 +235,7 @@ function renderTemplate(
   result = processChecksums(result);
 
   // Clean up remaining template artifacts
-  result = cleanupTemplate(result);
+  result = cleanupTemplate(result, warnings);
 
   return result;
 }
@@ -482,7 +490,7 @@ function processChecksums(template: string): string {
   );
 }
 
-function cleanupTemplate(template: string): string {
+function cleanupTemplate(template: string, warnings: string[]): string {
   let result = template;
 
   // Remove {{ $var := ... }} assignment lines
@@ -490,6 +498,15 @@ function cleanupTemplate(template: string): string {
 
   // Remove {{- fail "..." -}} lines
   result = result.replace(/\{\{-?\s*fail\s+"[^"]*"\s*-?\}\}\n?/g, '');
+
+  // Detect and warn about unresolved template directives before stripping them
+  const unresolvedMatches = result.match(/\{\{-?[^}]*-?\}\}/g);
+  if (unresolvedMatches) {
+    const unique = [...new Set(unresolvedMatches)];
+    for (const directive of unique) {
+      warnings.push(`Unresolved template directive stripped: ${directive}`);
+    }
+  }
 
   // Remove any remaining unresolved template directives (catch-all)
   result = result.replace(/\{\{-?[^}]*-?\}\}/g, '');
