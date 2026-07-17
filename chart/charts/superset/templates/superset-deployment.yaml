@@ -38,8 +38,8 @@ spec:
             - |
               echo "Waiting for PostgreSQL..."
               until python -c "
-              import socket, sys, os
-              host = os.environ.get('PGHOST', '{{ include "superset.postgres.fullname" . }}-svc')
+              import socket, sys
+              host = '{{ include "superset.postgres.fullname" . }}-svc'
               try:
                   s = socket.create_connection((host, 5432), timeout=2)
                   s.close()
