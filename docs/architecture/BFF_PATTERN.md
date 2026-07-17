@@ -10,7 +10,7 @@ The BFF (Backend For Frontend) pattern gives a plugin its own backend service. I
 
 ### When to Use a BFF
 
-- **Server-side aggregation** -- Combine multiple API calls into a single response (this plugin's Namespace Summary page demonstrates this)
+- **Server-side aggregation** -- Combine multiple API calls into a single response (for example, checking Superset deployment status aggregates K8s Deployment readiness plus a live Superset health ping)
 - **External service integration** -- Call third-party APIs using credentials stored server-side (API keys never reach the browser)
 - **Complex business logic** -- Processing that would be too expensive or impractical in the browser
 - **Data transformation** -- Heavy filtering, sorting, or enrichment before sending data to the frontend
@@ -30,24 +30,23 @@ The BFF (Backend For Frontend) pattern gives a plugin its own backend service. I
 ```text
 Browser                    Dashboard Backend              Plugin BFF              K8s API
   |                              |                            |                     |
-  |-- fetch('/apache-superset/api/namespace-summary') ----------->|                     |
+  |-- fetch('/apache-superset/api/superset/status') ------------>|                     |
   |                              |                            |                     |
   |                    [matches proxyService path]             |                     |
   |                    [authorize: true]                       |                     |
   |                              |                            |                     |
-  |                              |-- GET /api/namespace-summary                     |
+  |                              |-- GET /api/superset/status                       |
   |                              |   Authorization: Bearer <user-token>             |
   |                              |--------------------------->|                     |
   |                              |                            |                     |
-  |                              |                            |-- GET /apis/...     |
+  |                              |                            |-- GET /apis/apps/...|
   |                              |                            |   Bearer <user-token>|
   |                              |                            |------------------->|
-  |                              |                            |<-- projects list ---|
+  |                              |                            |<-- deployment status|
   |                              |                            |                     |
-  |                              |                            |-- GET /api/v1/...   |
-  |                              |                            |   Bearer <user-token>|
+  |                              |                            |-- GET /health (Superset)
   |                              |                            |------------------->|
-  |                              |                            |<-- pods list -------|
+  |                              |                            |<-- health response --|
   |                              |                            |                     |
   |                              |<-- aggregated response ----|                     |
   |<-- JSON response ------------|                            |                     |
@@ -55,7 +54,7 @@ Browser                    Dashboard Backend              Plugin BFF            
 
 Key points:
 
-1. The frontend calls a path like `/apache-superset/api/namespace-summary` at the same origin
+1. The frontend calls a path like `/apache-superset/api/superset/status` at the same origin
 2. The dashboard backend matches this against `proxyService` entries in the federation ConfigMap
 3. When `authorize: true`, the dashboard converts the user's `x-forwarded-access-token` into an `Authorization: Bearer <token>` header
 4. The BFF receives the user's actual OpenShift token and uses it for K8s API calls -- all RBAC permissions are the user's own
@@ -100,24 +99,30 @@ bff/
   tsconfig.json
   Containerfile             # UBI9 Node 22, runs on port 3000
   src/
-    server.ts               # Express app with health check + namespace summary route
-    types.ts                # Shared types (PodCounts, NamespaceInfo)
+    server.ts               # Express app with health check (Superset routes added per phase)
+    types.ts                # Shared types (K8sMetadata, K8sResource, K8sList; Superset types added per phase)
     routes/
-      namespaceSummary.ts   # GET /api/namespace-summary handler
+      superset/             # Superset-specific route handlers (added per phase)
+        deploy.ts           # POST/DELETE /api/superset/deploy — lifecycle management
+        status.ts           # GET  /api/superset/status       — health + readiness
+        guestToken.ts       # GET  /api/superset/guest-token  — generate embed token
+        dashboards.ts       # GET  /api/superset/dashboards   — list dashboards
     utils/
       k8sClient.ts          # Authenticated K8s API caller
   __tests__/
-    namespaceSummary.test.ts
     k8sClient.test.ts
+    superset/               # Superset route tests (added per phase)
 ```
 
-### Endpoint: `GET /api/namespace-summary`
+### Endpoint: `GET /api/superset/status`
 
 1. Extracts the Bearer token from the `Authorization` header
-2. Lists the user's projects via the OpenShift projects API (RBAC-scoped -- returns only projects the user can access)
-3. For each project, fetches pods and counts them by phase (Running, Pending, Succeeded, Failed, Unknown)
-4. Uses `Promise.allSettled` so one namespace failure doesn't break the entire response
-5. Returns an aggregated summary
+2. Checks the Superset `Deployment` readiness via the K8s API (RBAC-scoped to the user's namespace)
+3. Pings the Superset `/health` endpoint to confirm the application layer is responding
+4. Uses `Promise.allSettled` so a Superset health timeout doesn't mask the K8s readiness state
+5. Returns an aggregated status object: `{ deployed, ready, url, version, mode }`
+
+See `docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md` for the full list of planned BFF endpoints and their request/response shapes.
 
 ### K8s Client
 

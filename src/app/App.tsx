@@ -1,9 +1,8 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import CommunityBanner from './components/CommunityBanner';
-import UserInfoPage from './pages/UserInfoPage';
-import ClusterResourcesPage from './pages/ClusterResourcesPage';
-import NamespaceSummaryPage from './pages/NamespaceSummaryPage';
+import InstanceManagementPage from './pages/InstanceManagementPage';
+import EmbeddedDashboardsPage from './pages/EmbeddedDashboardsPage';
 
 const App: React.FC = () => (
   <div className="community-plugin-layout">
@@ -11,10 +10,9 @@ const App: React.FC = () => (
     <CommunityBanner />
     <div className="community-plugin-content">
       <Routes>
-        <Route path="/" element={<Navigate to="user-info" replace />} />
-        <Route path="user-info/*" element={<UserInfoPage />} />
-        <Route path="cluster-resources/*" element={<ClusterResourcesPage />} />
-        <Route path="namespace-summary/*" element={<NamespaceSummaryPage />} />
+        <Route path="/" element={<Navigate to="instance" replace />} />
+        <Route path="instance/*" element={<InstanceManagementPage />} />
+        <Route path="dashboards/*" element={<EmbeddedDashboardsPage />} />
       </Routes>
     </div>
   </div>

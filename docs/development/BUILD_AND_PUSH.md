@@ -40,6 +40,7 @@ make image-scan SEVERITY=MEDIUM
 | `REGISTRY` | Container image registry | `quay.io/rh-ai-community-plugins` |
 | `FRONTEND_IMAGE` | Frontend image name | `apache-superset` |
 | `BFF_IMAGE` | BFF image name | `apache-superset-bff` |
+| `SUPERSET_IMAGE` | Superset server image name | `apache-superset-server` |
 | `CHART_NAME` | Helm chart name | `apache-superset-chart` |
 | `VERSION` | Release version for `image-push` | Auto-computed from git tags |
 | `BUILDER` | Container build tool | `podman` |
@@ -55,6 +56,9 @@ The sections below document the underlying scripts that the Makefile wraps.
 - **Registry**: `quay.io`
 - **Frontend image**: `quay.io/OWNER/apache-superset`
 - **BFF image**: `quay.io/OWNER/apache-superset-bff`
+- **Superset server image**: `quay.io/OWNER/apache-superset-server`
+
+The Superset server image (`Containerfile.superset`) is a thin layer on top of `apache/superset:4.1.1` that adjusts group permissions (`chgrp -R 0`, `chmod -R g=u`) on `/app/superset_home` and `/app/pythonpath` and switches to `USER 1001`, making it compatible with OpenShift's `restricted` SCC.
 
 ## Prerequisites
 
@@ -76,7 +80,7 @@ The `scripts/build-push.sh` script builds container images and pushes them to Qu
 
 | Argument  | Values                        | Default |
 |-----------|-------------------------------|---------|
-| `TARGET`  | `frontend`, `bff`, or `all`   | `all`   |
+| `TARGET`  | `frontend`, `bff`, `superset`, or `all` | `all`   |
 | `VERSION` | Version tag (e.g. `0.5.0`, `0.5.0-rc1`) | Auto-computed from git tags |
 
 When `VERSION` is omitted, the script computes the next minor version from existing git tags and prompts for confirmation before proceeding.
@@ -84,10 +88,11 @@ When `VERSION` is omitted, the script computes the next minor version from exist
 ### Examples
 
 ```bash
-./scripts/build-push.sh                  # Build+push both, auto-version with confirmation
+./scripts/build-push.sh                  # Build+push all, auto-version with confirmation
 ./scripts/build-push.sh frontend         # Build+push frontend only
 ./scripts/build-push.sh bff 0.5.0-rc1    # Build+push BFF with explicit version
-./scripts/build-push.sh all 0.5.0        # Build+push both with explicit version
+./scripts/build-push.sh superset 0.5.0   # Build+push Superset server with explicit version
+./scripts/build-push.sh all 0.5.0        # Build+push all with explicit version
 ```
 
 ### Manual build and push
@@ -101,6 +106,9 @@ podman push quay.io/OWNER/apache-superset:0.5.0
 
 podman build -t quay.io/OWNER/apache-superset-bff:0.5.0 -f bff/Containerfile bff/
 podman push quay.io/OWNER/apache-superset-bff:0.5.0
+
+podman build -t quay.io/OWNER/apache-superset-server:0.5.0 -f Containerfile.superset .
+podman push quay.io/OWNER/apache-superset-server:0.5.0
 ```
 
 Buildah and Docker work the same way — substitute `buildah build` or `docker build`/`docker push`.
@@ -124,16 +132,17 @@ The `scripts/scan-image.sh` script builds container images and scans them for vu
 
 | Argument   | Values                        | Default          |
 |------------|-------------------------------|------------------|
-| `TARGET`   | `frontend`, `bff`, or `all`   | `all`            |
+| `TARGET`   | `frontend`, `bff`, `superset`, or `all` | `all`  |
 | `SEVERITY` | Trivy severity levels         | `HIGH,CRITICAL`  |
 
 ### Examples
 
 ```bash
-./scripts/scan-image.sh                  # Scan both frontend and BFF
+./scripts/scan-image.sh                  # Scan all images (frontend, BFF, Superset)
 ./scripts/scan-image.sh frontend         # Scan frontend only
 ./scripts/scan-image.sh bff              # Scan BFF only
-./scripts/scan-image.sh all MEDIUM       # Scan both with MEDIUM+ severity
+./scripts/scan-image.sh superset         # Scan Superset server only
+./scripts/scan-image.sh all MEDIUM       # Scan all with MEDIUM+ severity
 BUILDER=docker ./scripts/scan-image.sh   # Use Docker instead of Podman
 ```
 
@@ -193,4 +202,4 @@ See [OPENSHIFT_DEPLOY.md](../deployment/OPENSHIFT_DEPLOY.md) for the full deploy
 
 ## CI Workflow
 
-The `.github/workflows/build-push.yml` workflow can build and push both images from CI. It is manually triggered via GitHub's `workflow_dispatch` and requires a `version` input. It uses Buildah for builds and pushes to the same Quay.io registry.
+The `.github/workflows/build-push.yml` workflow can build and push all three images from CI. It is manually triggered via GitHub's `workflow_dispatch` and requires a `version` input. It uses Buildah for builds and pushes to the same Quay.io registry. The frontend, BFF, and Superset server jobs run in parallel.

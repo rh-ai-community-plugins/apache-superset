@@ -24,7 +24,7 @@ Usage: $(basename "$0") [TARGET] [SEVERITY]
 Build and scan container images for vulnerabilities using Trivy.
 
 Arguments:
-  TARGET    Which image to scan: frontend, bff, or all (default: all)
+  TARGET    Which image to scan: frontend, bff, superset, or all (default: all)
   SEVERITY  Trivy severity filter (default: HIGH,CRITICAL)
 
 Environment variables:
@@ -32,10 +32,11 @@ Environment variables:
   BUILDER     Container build tool (default: podman)
 
 Examples:
-  $(basename "$0")                  # Scan both frontend and BFF
+  $(basename "$0")                  # Scan all images (frontend, BFF, Superset)
   $(basename "$0") frontend         # Scan frontend only
   $(basename "$0") bff              # Scan BFF only
-  $(basename "$0") all MEDIUM       # Scan both with MEDIUM+ severity
+  $(basename "$0") superset         # Scan Superset server only
+  $(basename "$0") all MEDIUM       # Scan all with MEDIUM+ severity
   BUILDER=docker $(basename "$0")   # Use Docker instead of Podman
 EOF
 }
@@ -48,6 +49,10 @@ frontend_context="."
 bff_image_name="apache-superset-bff"
 bff_containerfile="bff/Containerfile"
 bff_context="bff/"
+
+superset_image_name="apache-superset-server"
+superset_containerfile="Containerfile.superset"
+superset_context="."
 
 # Check prerequisites
 check_prerequisites() {
@@ -67,11 +72,11 @@ check_prerequisites() {
 
     for target in "${targets[@]}"; do
         local containerfile
-        if [[ "${target}" == "frontend" ]]; then
-            containerfile="${frontend_containerfile}"
-        else
-            containerfile="${bff_containerfile}"
-        fi
+        case "${target}" in
+            frontend)  containerfile="${frontend_containerfile}" ;;
+            bff)       containerfile="${bff_containerfile}" ;;
+            superset)  containerfile="${superset_containerfile}" ;;
+        esac
 
         if [[ ! -f "${containerfile}" ]]; then
             log_error "Containerfile not found: ${containerfile}"
@@ -122,15 +127,23 @@ process_target() {
     local severity="$2"
     local image_name containerfile context
 
-    if [[ "${target}" == "frontend" ]]; then
-        image_name="${frontend_image_name}"
-        containerfile="${frontend_containerfile}"
-        context="${frontend_context}"
-    else
-        image_name="${bff_image_name}"
-        containerfile="${bff_containerfile}"
-        context="${bff_context}"
-    fi
+    case "${target}" in
+        frontend)
+            image_name="${frontend_image_name}"
+            containerfile="${frontend_containerfile}"
+            context="${frontend_context}"
+            ;;
+        bff)
+            image_name="${bff_image_name}"
+            containerfile="${bff_containerfile}"
+            context="${bff_context}"
+            ;;
+        superset)
+            image_name="${superset_image_name}"
+            containerfile="${superset_containerfile}"
+            context="${superset_context}"
+            ;;
+    esac
 
     echo ""
     log_info "--- ${target} ---"
@@ -150,7 +163,7 @@ main() {
     fi
 
     case "${target}" in
-        frontend|bff|all) ;;
+        frontend|bff|superset|all) ;;
         *)
             log_error "Unknown target: ${target}"
             usage
@@ -160,7 +173,7 @@ main() {
 
     local targets=()
     if [[ "${target}" == "all" ]]; then
-        targets=("frontend" "bff")
+        targets=("frontend" "bff" "superset")
     else
         targets=("${target}")
     fi

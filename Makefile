@@ -2,9 +2,10 @@
 
 # Container image settings
 REGISTRY       ?= quay.io/rh-ai-community-plugins
-FRONTEND_IMAGE ?= apache-superset
-BFF_IMAGE      ?= apache-superset-bff
-CHART_NAME     ?= apache-superset-chart  # used by help display only; chart-package/chart-push use chart/ directly
+FRONTEND_IMAGE  ?= apache-superset
+BFF_IMAGE       ?= apache-superset-bff
+SUPERSET_IMAGE  ?= apache-superset-server
+CHART_NAME      ?= apache-superset-chart  # used by help display only; chart-package/chart-push use chart/ directly
 VERSION        ?=
 BUILDER        ?= podman
 IMAGE_TAG      ?= latest
@@ -111,10 +112,10 @@ dev-bff: ## Start BFF dev server (port 3000, requires K8S_API_BASE)
 # Container images
 # ──────────────────────────────────────────────
 
-.PHONY: image-build image-build-frontend image-build-bff
-.PHONY: image-push image-push-frontend image-push-bff image-scan
+.PHONY: image-build image-build-frontend image-build-bff image-build-superset
+.PHONY: image-push image-push-frontend image-push-bff image-push-superset image-scan
 
-image-build: image-build-frontend image-build-bff ## Build container images
+image-build: image-build-frontend image-build-bff image-build-superset ## Build container images
 
 image-build-frontend:
 	$(BUILDER) build -t $(REGISTRY)/$(FRONTEND_IMAGE):$(IMAGE_TAG) -f Containerfile .
@@ -122,7 +123,10 @@ image-build-frontend:
 image-build-bff:
 	$(BUILDER) build -t $(REGISTRY)/$(BFF_IMAGE):$(IMAGE_TAG) -f bff/Containerfile bff/
 
-image-push: ## Build and push container images (frontend + BFF)
+image-build-superset:
+	$(BUILDER) build -t $(REGISTRY)/$(SUPERSET_IMAGE):$(IMAGE_TAG) -f Containerfile.superset .
+
+image-push: ## Build and push container images (frontend + BFF + Superset)
 	./scripts/build-push.sh all $(VERSION)
 
 image-push-frontend: ## Build and push frontend container image only
@@ -130,6 +134,9 @@ image-push-frontend: ## Build and push frontend container image only
 
 image-push-bff: ## Build and push BFF container image only
 	./scripts/build-push.sh bff $(VERSION)
+
+image-push-superset: ## Build and push Superset server container image only
+	./scripts/build-push.sh superset $(VERSION)
 
 image-scan: ## Build and scan images for vulnerabilities
 	BUILDER=$(BUILDER) IMAGE_TAG=$(IMAGE_TAG) ./scripts/scan-image.sh all $(SEVERITY)
@@ -171,6 +178,7 @@ help: ## Show this help
 	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "REGISTRY"       "Container image registry"             "$(REGISTRY)"
 	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "FRONTEND_IMAGE" "Frontend image name"                  "$(FRONTEND_IMAGE)"
 	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "BFF_IMAGE"      "BFF image name"                       "$(BFF_IMAGE)"
+	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "SUPERSET_IMAGE" "Superset server image name"           "$(SUPERSET_IMAGE)"
 	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "CHART_NAME"     "Helm chart name"                      "$(CHART_NAME)"
 	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "VERSION"        "Release version for image-push"       "auto-computed from git tags"
 	@printf "  \033[33m%-20s\033[0m %s (default: %s)\n" "BUILDER"        "Container build tool"                 "$(BUILDER)"
