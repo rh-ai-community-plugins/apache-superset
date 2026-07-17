@@ -1,11 +1,10 @@
-import http from 'http';
-import https from 'https';
 import {
   SupersetHealthResponse,
   SupersetLoginResponse,
   DashboardListResult,
   UserInfo,
 } from '../types';
+import { httpRequest } from './httpRequest';
 
 interface CachedToken {
   token: string;
@@ -205,75 +204,34 @@ export class SupersetClient {
     body?: unknown,
     bearerToken?: string,
   ): Promise<T | undefined> {
-    return new Promise((resolve, reject) => {
-      const url = new URL(path, this.baseUrl);
-      const isHttps = url.protocol === 'https:';
+    const url = new URL(path, this.baseUrl);
+    const isHttps = url.protocol === 'https:';
 
-      const headers: Record<string, string> = {
-        Accept: 'application/json',
-      };
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
 
-      if (bearerToken) {
-        headers['Authorization'] = `Bearer ${bearerToken}`;
-      }
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+    }
 
-      if (body !== undefined) {
-        headers['Content-Type'] = 'application/json';
-      }
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
 
-      const options: http.RequestOptions = {
-        hostname: url.hostname,
-        port: url.port,
-        path: url.pathname + url.search,
-        method,
-        headers,
-        timeout: REQUEST_TIMEOUT_MS,
-      };
-
-      if (isHttps) {
-        (options as https.RequestOptions).rejectUnauthorized = this.rejectUnauthorized;
-      }
-
-      const transport = isHttps ? https : http;
-      const req = transport.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            if (!data) {
-              resolve(undefined);
-              return;
-            }
-            try {
-              resolve(JSON.parse(data));
-            } catch {
-              resolve(data as T);
-            }
-          } else {
-            reject(
-              new SupersetApiError(
-                `Superset API returned ${res.statusCode} on ${method} ${path}`,
-                res.statusCode ?? 0,
-              ),
-            );
-          }
-        });
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error(`Superset API request timed out: ${method} ${path}`));
-      });
-
-      req.on('error', reject);
-
-      if (body !== undefined) {
-        req.write(JSON.stringify(body));
-      }
-
-      req.end();
+    return httpRequest<T>({
+      url: url.toString(),
+      method,
+      headers,
+      body,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      rejectUnauthorized: isHttps ? this.rejectUnauthorized : undefined,
+      makeError: (statusCode) =>
+        new SupersetApiError(
+          `Superset API returned ${statusCode} on ${method} ${path}`,
+          statusCode,
+        ),
+      lenientJson: true,
     });
   }
 }

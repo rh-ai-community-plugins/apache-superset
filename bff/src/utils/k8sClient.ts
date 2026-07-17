@@ -1,6 +1,5 @@
-import https from 'https';
-import http from 'http';
 import fs from 'fs';
+import { httpRequest } from './httpRequest';
 
 const CA_PATH = '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt';
 let cachedCa: Buffer | undefined;
@@ -42,79 +41,44 @@ export function k8sRequest<T = unknown>(
 ): Promise<T | undefined> {
   const { method = 'GET', body, contentType = 'application/json', timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
-  return new Promise((resolve, reject) => {
-    const baseUrl = getK8sBaseUrl();
-    const url = new URL(path, baseUrl);
-    const isHttps = url.protocol === 'https:';
+  const baseUrl = getK8sBaseUrl();
+  const url = new URL(path, baseUrl);
+  const isHttps = url.protocol === 'https:';
 
-    const requestOptions: https.RequestOptions = {
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname + url.search,
-      method,
-      timeout: timeoutMs,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    };
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+  };
 
-    if (body !== undefined) {
-      requestOptions.headers = {
-        ...requestOptions.headers,
-        'Content-Type': contentType,
-      };
+  if (body !== undefined) {
+    headers['Content-Type'] = contentType;
+  }
+
+  let rejectUnauthorized: boolean | undefined;
+  let ca: Buffer | undefined;
+
+  if (isHttps) {
+    if (process.env.K8S_API_BASE) {
+      rejectUnauthorized = false;
+    } else if (cachedCa) {
+      ca = cachedCa;
     }
+  }
 
-    if (isHttps) {
-      if (process.env.K8S_API_BASE) {
-        requestOptions.rejectUnauthorized = false;
-      } else if (cachedCa) {
-        requestOptions.ca = cachedCa;
-      }
-    }
-
-    const transport = isHttps ? https : http;
-    const req = transport.request(requestOptions, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          if (!data) {
-            resolve(undefined);
-            return;
-          }
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            reject(new Error('Failed to parse response JSON'));
-          }
-        } else {
-          reject(
-            new K8sApiError(
-              `K8s API returned ${res.statusCode}: ${data}`,
-              res.statusCode ?? 0,
-              data,
-            ),
-          );
-        }
-      });
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error(`K8s API request timed out after ${timeoutMs}ms: ${method} ${path}`));
-    });
-
-    req.on('error', reject);
-
-    if (body !== undefined) {
-      req.write(JSON.stringify(body));
-    }
-
-    req.end();
+  return httpRequest<T>({
+    url: url.toString(),
+    method,
+    headers,
+    body,
+    timeoutMs,
+    rejectUnauthorized,
+    ca,
+    makeError: (statusCode, responseBody) =>
+      new K8sApiError(
+        `K8s API returned ${statusCode}: ${responseBody}`,
+        statusCode,
+        responseBody,
+      ),
   });
 }
 
