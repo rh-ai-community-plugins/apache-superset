@@ -21,7 +21,7 @@ data:
 
     GUEST_ROLE_NAME = "Public"
     GUEST_TOKEN_JWT_SECRET = os.environ.get("SUPERSET_GUEST_TOKEN_JWT_SECRET", SECRET_KEY)
-    GUEST_TOKEN_JWT_EXP_SECONDS = int(os.environ.get("SUPERSET_GUEST_TOKEN_JWT_EXP_SECONDS", "{{ .Values.embedding.guestTokenExpSeconds }}"))
+    GUEST_TOKEN_JWT_EXP_SECONDS = int(os.environ.get("SUPERSET_GUEST_TOKEN_JWT_EXP_SECONDS", "{{ .Values.embedding.guestTokenExpSeconds | int }}"))
 
     # --- Security / CSP ---
     TALISMAN_ENABLED = True

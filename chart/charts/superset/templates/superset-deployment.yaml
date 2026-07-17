@@ -109,7 +109,7 @@ spec:
               type: RuntimeDefault
           ports:
             - name: http
-              containerPort: {{ .Values.port }}
+              containerPort: {{ .Values.port | int }}
               protocol: TCP
           envFrom:
             - secretRef:
