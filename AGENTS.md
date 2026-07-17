@@ -72,7 +72,7 @@ The following hooks will be implemented to support the Superset integration:
 - `useSupersetGuestToken` — Fetch guest tokens for embedding
 - `useSupersetDataSources` — Manage data warehouse connections
 
-Currently, the codebase contains the seed project's hooks (`useCurrentUser`, `useProjects`, `useFavoriteProjects`, `useK8sResources`, `useAccessReview`, `useNamespaceSummary`). Some will be retained (e.g., `useAccessReview` for RBAC checks), others replaced.
+Currently, the codebase retains these hooks from the seed project: `useCurrentUser`, `useProjects`, `useFavoriteProjects`, `useAccessReview`, and `useLastSelectedProject`. Some will be kept (e.g., `useAccessReview` for RBAC checks, `useLastSelectedProject` for project context), others replaced or removed as Superset-specific hooks are implemented.
 
 ### BFF Service
 

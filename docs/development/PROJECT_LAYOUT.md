@@ -18,16 +18,14 @@ Directory structure of the plugin.
 │       │   ├── ApacheSupersetNavIcon.tsx#     [PLUGIN-SPECIFIC] Your plugin's sidebar icon
 │       │   └── ProjectSelector.tsx #     Project selector with fuzzy search and favorites
 │       ├── pages/                  #   One file per page/route
-│       │   ├── UserInfoPage.tsx    #     Uses dashboard API pattern (/api/status)
-│       │   ├── ClusterResourcesPage.tsx  # Uses K8s API pass-through (/api/k8s/*)
-│       │   └── NamespaceSummaryPage.tsx  # Uses BFF pattern (plugin's own backend)
+│       │   ├── InstanceManagementPage.tsx  # Deploy, monitor, and manage the Superset instance
+│       │   └── EmbeddedDashboardsPage.tsx  # Browse and embed Superset dashboards inline
 │       └── hooks/                  #   Data-fetching hooks
 │           ├── useCurrentUser.ts   #     Dashboard API
 │           ├── useProjects.ts      #     K8s API
 │           ├── useFavoriteProjects.ts  # localStorage-backed project favorites
-│           ├── useK8sResources.ts  #     K8s API (generic CRUD)
-│           ├── useAccessReview.ts  #     RBAC check via SelfSubjectAccessReview
-│           └── useNamespaceSummary.ts  # BFF call
+│           ├── useLastSelectedProject.ts # localStorage-backed last selected project
+│           └── useAccessReview.ts  #     RBAC check via SelfSubjectAccessReview
 ├── config/                          # Webpack configs
 │   ├── webpack.common.js            #   Module Federation setup, loaders, path alias (~ → src)
 │   ├── webpack.dev.js               #   Dev server (port 9500), proxy rules
@@ -35,7 +33,7 @@ Directory structure of the plugin.
 ├── bff/                             # Backend-For-Frontend service (optional — only if using BFF pattern)
 │   └── src/
 │       ├── server.ts                #   Express server entry
-│       ├── types.ts                 #   Shared types (PodCounts, NamespaceInfo)
+│       ├── types.ts                 #   Shared types (K8sResource, K8sList)
 │       ├── routes/                  #   API route handlers
 │       └── utils/                   #   K8s client helpers
 ├── chart/                           # Helm chart for OpenShift deployment
