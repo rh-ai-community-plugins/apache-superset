@@ -121,6 +121,21 @@ describe('applyResource', () => {
   });
 });
 
+describe('kindToResource (via applyResource)', () => {
+  it('throws for an unmapped K8s kind', async () => {
+    const ingress: K8sResource = {
+      apiVersion: 'networking.k8s.io/v1',
+      kind: 'Ingress',
+      metadata: { name: 'my-ingress', namespace: 'test-ns' },
+    };
+
+    await expect(applyResource('token', ingress)).rejects.toThrow(
+      'Unknown K8s kind "Ingress" — add it to KIND_RESOURCE_MAP in k8sApply.ts',
+    );
+    expect(mockedK8sRequest).not.toHaveBeenCalled();
+  });
+});
+
 describe('deleteResource', () => {
   it('sends DELETE to the correct path', async () => {
     mockedK8sRequest.mockResolvedValue({ status: 'Success' });

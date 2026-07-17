@@ -42,7 +42,9 @@ function kindToResource(kind: string): string {
   if (mapped) {
     return mapped;
   }
-  return kind.toLowerCase() + 's';
+  throw new Error(
+    `Unknown K8s kind "${kind}" — add it to KIND_RESOURCE_MAP in k8sApply.ts`,
+  );
 }
 
 export async function applyResource(
