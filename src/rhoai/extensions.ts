@@ -32,36 +32,25 @@ export const apacheSupersetSectionExtension = {
   },
 };
 
-export const userInfoNavExtension = {
+export const instanceNavExtension = {
   type: 'app.navigation/href' as const,
   properties: {
-    id: 'apache-superset-user-info', // [PLUGIN-SPECIFIC] unique nav item ID
-    title: 'User Info',
-    href: '/apache-superset/user-info', // [PLUGIN-SPECIFIC] must match route prefix
-    section: 'apache-superset', // [PLUGIN-SPECIFIC] references this plugin's section ID
-    path: '/apache-superset/user-info/*', // [PLUGIN-SPECIFIC] route-matching pattern
+    id: 'apache-superset-instance',
+    title: 'Instance',
+    href: '/apache-superset/instance',
+    section: 'apache-superset',
+    path: '/apache-superset/instance/*',
   },
 };
 
-export const clusterResourcesNavExtension = {
+export const dashboardsNavExtension = {
   type: 'app.navigation/href' as const,
   properties: {
-    id: 'apache-superset-cluster-resources', // [PLUGIN-SPECIFIC] unique nav item ID
-    title: 'Cluster Resources',
-    href: '/apache-superset/cluster-resources', // [PLUGIN-SPECIFIC] must match route prefix
-    section: 'apache-superset', // [PLUGIN-SPECIFIC] references this plugin's section ID
-    path: '/apache-superset/cluster-resources/*', // [PLUGIN-SPECIFIC] route-matching pattern
-  },
-};
-
-export const namespaceSummaryNavExtension = {
-  type: 'app.navigation/href' as const,
-  properties: {
-    id: 'apache-superset-namespace-summary', // [PLUGIN-SPECIFIC] unique nav item ID
-    title: 'Namespace Summary',
-    href: '/apache-superset/namespace-summary', // [PLUGIN-SPECIFIC] must match route prefix
-    section: 'apache-superset', // [PLUGIN-SPECIFIC] references this plugin's section ID
-    path: '/apache-superset/namespace-summary/*', // [PLUGIN-SPECIFIC] route-matching pattern
+    id: 'apache-superset-dashboards',
+    title: 'Dashboards',
+    href: '/apache-superset/dashboards',
+    section: 'apache-superset',
+    path: '/apache-superset/dashboards/*',
   },
 };
 
@@ -77,9 +66,8 @@ export const extensions = [
   communityPluginsSectionExtension,
   apacheSupersetAreaExtension,
   apacheSupersetSectionExtension,
-  userInfoNavExtension,
-  clusterResourcesNavExtension,
-  namespaceSummaryNavExtension,
+  instanceNavExtension,
+  dashboardsNavExtension,
   apacheSupersetRouteExtension,
 ];
 

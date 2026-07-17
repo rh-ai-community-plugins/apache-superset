@@ -2,9 +2,8 @@ import {
   apacheSupersetAreaExtension,
   communityPluginsSectionExtension,
   apacheSupersetSectionExtension,
-  userInfoNavExtension,
-  clusterResourcesNavExtension,
-  namespaceSummaryNavExtension,
+  instanceNavExtension,
+  dashboardsNavExtension,
   apacheSupersetRouteExtension,
   extensions,
 } from '../extensions';
@@ -46,31 +45,22 @@ describe('RHOAI Plugin Extensions', () => {
   });
 
   describe('navigation extensions', () => {
-    it('should define User Info nav item under apache-superset section', () => {
-      expect(userInfoNavExtension.type).toBe('app.navigation/href');
-      expect(userInfoNavExtension.properties.id).toBe('apache-superset-user-info');
-      expect(userInfoNavExtension.properties.title).toBe('User Info');
-      expect(userInfoNavExtension.properties.href).toBe('/apache-superset/user-info');
-      expect(userInfoNavExtension.properties.section).toBe('apache-superset');
-      expect(userInfoNavExtension.properties.path).toBe('/apache-superset/user-info/*');
+    it('should define Instance nav item under apache-superset section', () => {
+      expect(instanceNavExtension.type).toBe('app.navigation/href');
+      expect(instanceNavExtension.properties.id).toBe('apache-superset-instance');
+      expect(instanceNavExtension.properties.title).toBe('Instance');
+      expect(instanceNavExtension.properties.href).toBe('/apache-superset/instance');
+      expect(instanceNavExtension.properties.section).toBe('apache-superset');
+      expect(instanceNavExtension.properties.path).toBe('/apache-superset/instance/*');
     });
 
-    it('should define Cluster Resources nav item under apache-superset section', () => {
-      expect(clusterResourcesNavExtension.type).toBe('app.navigation/href');
-      expect(clusterResourcesNavExtension.properties.id).toBe('apache-superset-cluster-resources');
-      expect(clusterResourcesNavExtension.properties.title).toBe('Cluster Resources');
-      expect(clusterResourcesNavExtension.properties.href).toBe('/apache-superset/cluster-resources');
-      expect(clusterResourcesNavExtension.properties.section).toBe('apache-superset');
-      expect(clusterResourcesNavExtension.properties.path).toBe('/apache-superset/cluster-resources/*');
-    });
-
-    it('should define Namespace Summary nav item under apache-superset section', () => {
-      expect(namespaceSummaryNavExtension.type).toBe('app.navigation/href');
-      expect(namespaceSummaryNavExtension.properties.id).toBe('apache-superset-namespace-summary');
-      expect(namespaceSummaryNavExtension.properties.title).toBe('Namespace Summary');
-      expect(namespaceSummaryNavExtension.properties.href).toBe('/apache-superset/namespace-summary');
-      expect(namespaceSummaryNavExtension.properties.section).toBe('apache-superset');
-      expect(namespaceSummaryNavExtension.properties.path).toBe('/apache-superset/namespace-summary/*');
+    it('should define Dashboards nav item under apache-superset section', () => {
+      expect(dashboardsNavExtension.type).toBe('app.navigation/href');
+      expect(dashboardsNavExtension.properties.id).toBe('apache-superset-dashboards');
+      expect(dashboardsNavExtension.properties.title).toBe('Dashboards');
+      expect(dashboardsNavExtension.properties.href).toBe('/apache-superset/dashboards');
+      expect(dashboardsNavExtension.properties.section).toBe('apache-superset');
+      expect(dashboardsNavExtension.properties.path).toBe('/apache-superset/dashboards/*');
     });
   });
 
@@ -84,8 +74,8 @@ describe('RHOAI Plugin Extensions', () => {
   });
 
   describe('extensions array', () => {
-    it('should contain all seven extensions', () => {
-      expect(extensions).toHaveLength(7);
+    it('should contain all six extensions', () => {
+      expect(extensions).toHaveLength(6);
     });
 
     it('should include all extensions in the correct order', () => {
@@ -93,9 +83,8 @@ describe('RHOAI Plugin Extensions', () => {
         communityPluginsSectionExtension,
         apacheSupersetAreaExtension,
         apacheSupersetSectionExtension,
-        userInfoNavExtension,
-        clusterResourcesNavExtension,
-        namespaceSummaryNavExtension,
+        instanceNavExtension,
+        dashboardsNavExtension,
         apacheSupersetRouteExtension,
       ]);
     });
