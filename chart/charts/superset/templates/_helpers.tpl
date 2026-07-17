@@ -9,7 +9,7 @@ superset
 Fully qualified name — scoped to the release.
 */}}
 {{- define "superset.fullname" -}}
-{{- printf "%s-superset" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-superset" .Release.Name | trunc 50 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -53,7 +53,7 @@ Service account name.
 PostgreSQL fullname.
 */}}
 {{- define "superset.postgres.fullname" -}}
-{{- printf "%s-postgres" (include "superset.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-postgres" (include "superset.fullname" .) | trunc 50 | trimSuffix "-" }}
 {{- end }}
 
 {{/*

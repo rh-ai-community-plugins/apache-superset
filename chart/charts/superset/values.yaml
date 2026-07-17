@@ -52,6 +52,9 @@ postgres:
       cpu: 500m
       memory: 512Mi
 
+tls:
+  forceHttps: "false"
+
 route:
   enabled: false
   host: ""
