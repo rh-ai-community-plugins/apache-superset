@@ -1,0 +1,14 @@
+apiVersion: v2
+name: apache-superset-chart
+description: A Helm chart for deploying the RHOAI Apache Superset plugin
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - rhoai
+  - openshift-ai
+  - plugin
+  - apache-superset
+home: https://github.com/rh-ai-community-plugins/apache-superset
+sources:
+  - https://github.com/rh-ai-community-plugins/apache-superset
