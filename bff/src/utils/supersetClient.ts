@@ -23,6 +23,7 @@ export class SupersetClient {
   private readonly baseUrl: string;
   private readonly rejectUnauthorized: boolean;
   private cachedAccessToken: CachedToken | null = null;
+  private loginPromise: Promise<string> | null = null;
 
   constructor(
     private readonly supersetUrl: string,
@@ -44,6 +45,16 @@ export class SupersetClient {
       return this.cachedAccessToken.token;
     }
 
+    if (!this.loginPromise) {
+      this.loginPromise = this.doLogin().finally(() => {
+        this.loginPromise = null;
+      });
+    }
+
+    return this.loginPromise;
+  }
+
+  private async doLogin(): Promise<string> {
     const response = await this.request<SupersetLoginResponse>(
       'POST',
       '/api/v1/security/login',
