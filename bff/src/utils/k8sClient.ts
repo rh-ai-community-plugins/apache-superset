@@ -39,7 +39,7 @@ export function k8sRequest<T = unknown>(
   token: string,
   path: string,
   options: K8sRequestOptions = {},
-): Promise<T> {
+): Promise<T | undefined> {
   const { method = 'GET', body, contentType = 'application/json', timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
   return new Promise((resolve, reject) => {
@@ -83,7 +83,7 @@ export function k8sRequest<T = unknown>(
       res.on('end', () => {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
           if (!data) {
-            resolve(undefined as T);
+            resolve(undefined);
             return;
           }
           try {

@@ -86,6 +86,39 @@ describe('applyResource', () => {
     await expect(applyResource('token', configMap)).rejects.toThrow(K8sApiError);
   });
 
+  it('throws when POST returns an empty body', async () => {
+    mockedK8sRequest.mockResolvedValue(undefined);
+
+    await expect(applyResource('token', configMap)).rejects.toThrow(
+      'Unexpected empty response from K8s API: POST /api/v1/namespaces/my-ns/configmaps',
+    );
+  });
+
+  it('throws when GET returns empty body during 409 conflict resolution', async () => {
+    const conflictError = new K8sApiError('conflict', 409, '{}');
+    mockedK8sRequest.mockRejectedValueOnce(conflictError);
+    mockedK8sRequest.mockResolvedValueOnce(undefined); // GET returns empty
+
+    await expect(applyResource('token', configMap)).rejects.toThrow(
+      'Unexpected empty response from K8s API: GET /api/v1/namespaces/my-ns/configmaps/test-config',
+    );
+  });
+
+  it('throws when PUT returns empty body during 409 conflict resolution', async () => {
+    const conflictError = new K8sApiError('conflict', 409, '{}');
+    const existingResource = {
+      ...configMap,
+      metadata: { ...configMap.metadata, resourceVersion: '99' },
+    };
+    mockedK8sRequest.mockRejectedValueOnce(conflictError);
+    mockedK8sRequest.mockResolvedValueOnce(existingResource); // GET succeeds
+    mockedK8sRequest.mockResolvedValueOnce(undefined); // PUT returns empty
+
+    await expect(applyResource('token', configMap)).rejects.toThrow(
+      'Unexpected empty response from K8s API: PUT /api/v1/namespaces/my-ns/configmaps/test-config',
+    );
+  });
+
   it('builds correct API path for namespaced core resource', async () => {
     mockedK8sRequest.mockResolvedValue({});
 
@@ -179,6 +212,16 @@ describe('getResource', () => {
     );
     expect(result).toEqual(resource);
   });
+
+  it('throws when the response body is empty', async () => {
+    mockedK8sRequest.mockResolvedValue(undefined);
+
+    await expect(
+      getResource('token', 'v1', 'Secret', 'test-ns', 'my-secret'),
+    ).rejects.toThrow(
+      'Unexpected empty response from K8s API: GET /api/v1/namespaces/test-ns/secrets/my-secret',
+    );
+  });
 });
 
 describe('listResources', () => {
@@ -213,6 +256,16 @@ describe('listResources', () => {
     expect(mockedK8sRequest).toHaveBeenCalledWith(
       'token',
       '/apis/apps/v1/namespaces/test-ns/deployments?labelSelector=app.kubernetes.io%2Fpart-of%3Dsuperset',
+    );
+  });
+
+  it('throws when the response body is empty', async () => {
+    mockedK8sRequest.mockResolvedValue(undefined);
+
+    await expect(
+      listResources('token', 'v1', 'Secret', 'test-ns'),
+    ).rejects.toThrow(
+      'Unexpected empty response from K8s API: GET /api/v1/namespaces/test-ns/secrets',
     );
   });
 });

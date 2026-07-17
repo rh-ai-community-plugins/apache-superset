@@ -75,6 +75,13 @@ export class SupersetClient {
       },
     );
 
+    if (response === undefined) {
+      throw new SupersetApiError(
+        'Empty response from Superset login endpoint',
+        0,
+      );
+    }
+
     this.cachedAccessToken = {
       token: response.access_token,
       expiresAt: Date.now() + TOKEN_TTL_MS,
@@ -93,7 +100,7 @@ export class SupersetClient {
     method: string,
     path: string,
     body?: unknown,
-  ): Promise<T> {
+  ): Promise<T | undefined> {
     const token = await this.getAccessToken();
     try {
       return await this.request<T>(method, path, body, token);
@@ -133,10 +140,18 @@ export class SupersetClient {
       },
     );
 
+    if (response === undefined) {
+      throw new SupersetApiError(
+        'Empty response from Superset guest token endpoint',
+        0,
+      );
+    }
+
     return response.token;
   }
 
   async listDashboards(page = 0, pageSize = 100): Promise<DashboardListResult> {
+    const path = `/api/v1/dashboard/?q=(page:${page},page_size:${pageSize})`;
     const response = await this.authenticatedRequest<{
       result: Array<{
         id: number;
@@ -149,8 +164,15 @@ export class SupersetClient {
       count: number;
     }>(
       'GET',
-      `/api/v1/dashboard/?q=(page:${page},page_size:${pageSize})`,
+      path,
     );
+
+    if (response === undefined) {
+      throw new SupersetApiError(
+        `Empty response from Superset dashboard list endpoint: GET ${path}`,
+        0,
+      );
+    }
 
     return {
       dashboards: response.result.map((d) => ({
@@ -182,7 +204,7 @@ export class SupersetClient {
     path: string,
     body?: unknown,
     bearerToken?: string,
-  ): Promise<T> {
+  ): Promise<T | undefined> {
     return new Promise((resolve, reject) => {
       const url = new URL(path, this.baseUrl);
       const isHttps = url.protocol === 'https:';
@@ -221,7 +243,7 @@ export class SupersetClient {
         res.on('end', () => {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             if (!data) {
-              resolve(undefined as T);
+              resolve(undefined);
               return;
             }
             try {
