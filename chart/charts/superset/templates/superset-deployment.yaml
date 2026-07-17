@@ -73,12 +73,21 @@ spec:
               echo "Running database migrations..."
               superset db upgrade
               echo "Creating admin user..."
-              superset fab create-admin \
+              output=$(superset fab create-admin \
                 --username "${SUPERSET_ADMIN_USERNAME}" \
                 --firstname "${SUPERSET_ADMIN_FIRSTNAME}" \
                 --lastname "${SUPERSET_ADMIN_LASTNAME}" \
                 --email "${SUPERSET_ADMIN_EMAIL}" \
-                --password "${SUPERSET_ADMIN_PASSWORD}" || true
+                --password "${SUPERSET_ADMIN_PASSWORD}" 2>&1) || {
+                rc=$?
+                if echo "$output" | grep -q "already exists"; then
+                  echo "Admin user already exists, skipping."
+                else
+                  printf 'create-admin failed (exit %d):\n%s\n' "$rc" "$output" >&2
+                  exit $rc
+                fi
+              }
+              echo "$output"
               echo "Initializing Superset..."
               superset init
               echo "Init complete."
