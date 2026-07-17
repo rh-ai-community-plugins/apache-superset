@@ -43,9 +43,9 @@ Deploy your own backend service alongside the plugin. The dashboard proxies requ
 - You need to keep API keys or credentials server-side
 - You need server-side business logic or heavy data processing
 
-**See:** [Section 1.3](#13-using-your-own-backend-bff-pattern) and the [BFF Pattern guide](../architecture/BFF_PATTERN.md) — the BFF lists the user's projects and counts pods per namespace server-side, returning a single aggregated response.
+**See:** [BFF Pattern guide](../architecture/BFF_PATTERN.md) — describes how the plugin's BFF checks the Superset deployment status, authenticates to the Superset API, and generates scoped guest tokens for embedded dashboards on behalf of the RHOAI user.
 
-**How it works:** Your frontend calls `fetch('/apache-superset/api/namespace-summary')`. The dashboard matches the path against the `proxyService` configuration, rewrites it to `/api/namespace-summary`, and forwards the request to your BFF service with the user's Bearer token. Your BFF uses the token to make K8s API calls as the user.
+**How it works:** Your frontend calls `fetch('/apache-superset/api/superset/status')`. The dashboard matches the path against the `proxyService` configuration, rewrites it to `/api/superset/status`, and forwards the request to your BFF service with the user's Bearer token. Your BFF uses the token to verify the Superset deployment and interact with the Superset API server-side.
 
 See [section 1.3](#13-using-your-own-backend-bff-pattern) below and the full [BFF Pattern guide](../architecture/BFF_PATTERN.md) for setup details, token flow, and deployment configuration.
 
