@@ -14,16 +14,25 @@ interface CachedToken {
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+export interface SupersetClientOptions {
+  rejectUnauthorized?: boolean;
+}
+
 export class SupersetClient {
   private readonly baseUrl: string;
+  private readonly rejectUnauthorized: boolean;
   private cachedAccessToken: CachedToken | null = null;
 
   constructor(
     private readonly supersetUrl: string,
     private readonly adminUsername: string,
     private readonly adminPassword: string,
+    options: SupersetClientOptions = {},
   ) {
     this.baseUrl = supersetUrl.replace(/\/+$/, '');
+    // In-cluster Superset uses self-signed certs or plain HTTP; default to
+    // skipping TLS verification since BFF and Superset are co-located.
+    this.rejectUnauthorized = options.rejectUnauthorized ?? false;
   }
 
   async getAccessToken(): Promise<string> {
@@ -151,7 +160,7 @@ export class SupersetClient {
       };
 
       if (isHttps) {
-        (options as https.RequestOptions).rejectUnauthorized = false;
+        (options as https.RequestOptions).rejectUnauthorized = this.rejectUnauthorized;
       }
 
       const transport = isHttps ? https : http;
@@ -174,7 +183,7 @@ export class SupersetClient {
           } else {
             reject(
               new Error(
-                `Superset API returned ${res.statusCode}: ${data}`,
+                `Superset API returned ${res.statusCode} on ${method} ${path}`,
               ),
             );
           }

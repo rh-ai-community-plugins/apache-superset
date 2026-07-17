@@ -9,11 +9,16 @@ export function renderHelmTemplates(
   context: HelmRenderContext,
   chartDir: string = DEFAULT_CHART_DIR,
 ): K8sResource[] {
-  const chartMeta = loadChartMeta(chartDir);
-  const values = mergeDefaults(chartDir, context.values);
+  const resolved = path.resolve(chartDir);
+  if (!resolved.includes('chart/charts/')) {
+    throw new Error('chartDir must be within the chart/charts/ directory');
+  }
+
+  const chartMeta = loadChartMeta(resolved);
+  const values = mergeDefaults(resolved, context.values);
   const helpers = buildHelpers(context, chartMeta, values);
 
-  const templatesDir = path.join(chartDir, 'templates');
+  const templatesDir = path.join(resolved, 'templates');
   const templateFiles = fs
     .readdirSync(templatesDir)
     .filter((f) => f.endsWith('.yaml'))

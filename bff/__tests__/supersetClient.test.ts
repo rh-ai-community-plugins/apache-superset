@@ -64,7 +64,7 @@ describe('SupersetClient', () => {
       setupMockRequest(401, '{"message":"Invalid credentials"}');
 
       await expect(client.getAccessToken()).rejects.toThrow(
-        'Superset API returned 401',
+        'Superset API returned 401 on POST /api/v1/security/login',
       );
     });
   });
