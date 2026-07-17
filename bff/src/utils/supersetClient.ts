@@ -3,7 +3,7 @@ import https from 'https';
 import {
   SupersetHealthResponse,
   SupersetLoginResponse,
-  SupersetDashboard,
+  DashboardListResult,
   UserInfo,
 } from '../types';
 
@@ -136,7 +136,7 @@ export class SupersetClient {
     return response.token;
   }
 
-  async listDashboards(): Promise<SupersetDashboard[]> {
+  async listDashboards(page = 0, pageSize = 100): Promise<DashboardListResult> {
     const response = await this.authenticatedRequest<{
       result: Array<{
         id: number;
@@ -146,19 +146,25 @@ export class SupersetClient {
         embedded?: Array<{ uuid: string }>;
         thumbnail_url?: string;
       }>;
+      count: number;
     }>(
       'GET',
-      '/api/v1/dashboard/?q=(page:0,page_size:100)',
+      `/api/v1/dashboard/?q=(page:${page},page_size:${pageSize})`,
     );
 
-    return response.result.map((d) => ({
-      id: d.id,
-      title: d.dashboard_title,
-      url: d.url,
-      status: d.status,
-      embeddedId: d.embedded?.[0]?.uuid,
-      thumbnailUrl: d.thumbnail_url,
-    }));
+    return {
+      dashboards: response.result.map((d) => ({
+        id: d.id,
+        title: d.dashboard_title,
+        url: d.url,
+        status: d.status,
+        embeddedId: d.embedded?.[0]?.uuid,
+        thumbnailUrl: d.thumbnail_url,
+      })),
+      totalCount: response.count,
+      page,
+      pageSize,
+    };
   }
 
   async getSupersetHealth(): Promise<SupersetHealthResponse> {
