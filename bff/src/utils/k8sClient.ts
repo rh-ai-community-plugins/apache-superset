@@ -1,4 +1,5 @@
 import https from 'https';
+import http from 'http';
 import fs from 'fs';
 
 const CA_PATH = '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt';
@@ -23,49 +24,98 @@ export function getK8sBaseUrl(): string {
   );
 }
 
-export function k8sRequest<T = unknown>(token: string, path: string): Promise<T> {
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
+export interface K8sRequestOptions {
+  method?: HttpMethod;
+  body?: unknown;
+  contentType?: string;
+}
+
+export function k8sRequest<T = unknown>(
+  token: string,
+  path: string,
+  options: K8sRequestOptions = {},
+): Promise<T> {
+  const { method = 'GET', body, contentType = 'application/json' } = options;
+
   return new Promise((resolve, reject) => {
     const baseUrl = getK8sBaseUrl();
     const url = new URL(path, baseUrl);
+    const isHttps = url.protocol === 'https:';
 
-    const options: https.RequestOptions = {
+    const requestOptions: https.RequestOptions = {
       hostname: url.hostname,
       port: url.port,
       path: url.pathname + url.search,
-      method: 'GET',
+      method,
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
       },
     };
 
-    if (process.env.K8S_API_BASE) {
-      options.rejectUnauthorized = false;
-    } else if (cachedCa) {
-      options.ca = cachedCa;
+    if (body !== undefined) {
+      requestOptions.headers = {
+        ...requestOptions.headers,
+        'Content-Type': contentType,
+      };
     }
 
-    const req = https.request(options, (res) => {
+    if (isHttps) {
+      if (process.env.K8S_API_BASE) {
+        requestOptions.rejectUnauthorized = false;
+      } else if (cachedCa) {
+        requestOptions.ca = cachedCa;
+      }
+    }
+
+    const transport = isHttps ? https : http;
+    const req = transport.request(requestOptions, (res) => {
       let data = '';
       res.on('data', (chunk) => {
         data += chunk;
       });
       res.on('end', () => {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          if (!data) {
+            resolve(undefined as T);
+            return;
+          }
           try {
             resolve(JSON.parse(data));
-          } catch (err) {
+          } catch {
             reject(new Error('Failed to parse response JSON'));
           }
         } else {
           reject(
-            new Error(`K8s API returned ${res.statusCode}: ${data}`),
+            new K8sApiError(
+              `K8s API returned ${res.statusCode}: ${data}`,
+              res.statusCode ?? 0,
+              data,
+            ),
           );
         }
       });
     });
 
     req.on('error', reject);
+
+    if (body !== undefined) {
+      req.write(JSON.stringify(body));
+    }
+
     req.end();
   });
+}
+
+export class K8sApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly body: string,
+  ) {
+    super(message);
+    this.name = 'K8sApiError';
+  }
 }
