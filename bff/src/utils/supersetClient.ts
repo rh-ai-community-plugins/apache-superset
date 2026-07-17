@@ -15,6 +15,16 @@ interface CachedToken {
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const REQUEST_TIMEOUT_MS = 30_000;
 
+export class SupersetApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'SupersetApiError';
+  }
+}
+
 export interface SupersetClientOptions {
   rejectUnauthorized?: boolean;
 }
@@ -73,13 +83,38 @@ export class SupersetClient {
     return response.access_token;
   }
 
+  /**
+   * Superset JWTs may be revoked server-side (e.g. server restart, explicit
+   * revocation) before the client-side TTL expires, causing stale-cache 401s.
+   * This wrapper detects those 401s, discards the stale token, and retries
+   * once so callers recover transparently without manual cache management.
+   */
+  private async authenticatedRequest<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    const token = await this.getAccessToken();
+    try {
+      return await this.request<T>(method, path, body, token);
+    } catch (err) {
+      if (err instanceof SupersetApiError && err.statusCode === 401) {
+        // Invalidate the stale token and any in-flight login so the next call
+        // triggers a fresh login instead of reusing the failed credential.
+        this.cachedAccessToken = null;
+        this.loginPromise = null;
+        const freshToken = await this.getAccessToken();
+        return this.request<T>(method, path, body, freshToken);
+      }
+      throw err;
+    }
+  }
+
   async generateGuestToken(
     dashboardId: string,
     user: UserInfo,
   ): Promise<string> {
-    const accessToken = await this.getAccessToken();
-
-    const response = await this.request<{ token: string }>(
+    const response = await this.authenticatedRequest<{ token: string }>(
       'POST',
       '/api/v1/security/guest_token/',
       {
@@ -96,16 +131,13 @@ export class SupersetClient {
         ],
         rls: [],
       },
-      accessToken,
     );
 
     return response.token;
   }
 
   async listDashboards(): Promise<SupersetDashboard[]> {
-    const accessToken = await this.getAccessToken();
-
-    const response = await this.request<{
+    const response = await this.authenticatedRequest<{
       result: Array<{
         id: number;
         dashboard_title: string;
@@ -117,8 +149,6 @@ export class SupersetClient {
     }>(
       'GET',
       '/api/v1/dashboard/?q=(page:0,page_size:100)',
-      undefined,
-      accessToken,
     );
 
     return response.result.map((d) => ({
@@ -195,8 +225,9 @@ export class SupersetClient {
             }
           } else {
             reject(
-              new Error(
+              new SupersetApiError(
                 `Superset API returned ${res.statusCode} on ${method} ${path}`,
+                res.statusCode ?? 0,
               ),
             );
           }
