@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "superset.fullname" . }}-config
+  labels:
+    {{- include "superset.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+data:
+  superset_config.py: |
+    import os
+
+    # --- Core ---
+    SECRET_KEY = os.environ.get("SUPERSET_SECRET_KEY", "CHANGE_ME_IN_PRODUCTION")
+    SQLALCHEMY_DATABASE_URI = os.environ.get("SUPERSET_SQLALCHEMY_DATABASE_URI")
+
+    # --- Embedding ---
+    FEATURE_FLAGS = {
+        "EMBEDDED_SUPERSET": {{ if .Values.embedding.enabled }}True{{ else }}False{{ end }},
+        "ALERT_REPORTS": False,
+    }
+
+    GUEST_ROLE_NAME = "Public"
+    GUEST_TOKEN_JWT_SECRET = os.environ.get("SUPERSET_GUEST_TOKEN_JWT_SECRET", SECRET_KEY)
+    GUEST_TOKEN_JWT_EXP_SECONDS = int(os.environ.get("SUPERSET_GUEST_TOKEN_JWT_EXP_SECONDS", "{{ .Values.embedding.guestTokenExpSeconds }}"))
+
+    # --- Security / CSP ---
+    TALISMAN_ENABLED = True
+    TALISMAN_CONFIG = {
+        "content_security_policy": {
+            "default-src": ["'self'"],
+            "img-src": ["'self'", "data:", "blob:"],
+            "worker-src": ["'self'", "blob:"],
+            "connect-src": ["'self'"],
+            "style-src": ["'self'", "'unsafe-inline'"],
+            "script-src": ["'self'", "'unsafe-eval'"],
+            "frame-ancestors": ["'self'"] + [
+                o.strip() for o in os.environ.get("SUPERSET_ALLOWED_ORIGINS", "").split(",") if o.strip()
+            ],
+        },
+        "frame_options": None,
+        "force_https": os.environ.get("SUPERSET_FORCE_HTTPS", "false").lower() == "true",
+    }
+
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
+    ENABLE_PROXY_FIX = True
+
+    # --- CSRF ---
+    WTF_CSRF_ENABLED = True
+    WTF_CSRF_EXEMPT_LIST = [
+        "superset.security.api",
+    ]
+
+    # --- Cache (lightweight mode — no Redis) ---
+    CACHE_CONFIG = {
+        "CACHE_TYPE": "SimpleCache",
+        "CACHE_DEFAULT_TIMEOUT": 300,
+    }
+    DATA_CACHE_CONFIG = CACHE_CONFIG
+    FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
+    EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
+
+    # --- Web server ---
+    SUPERSET_WEBSERVER_PORT = {{ .Values.port }}
+    ROW_LIMIT = 50000
+    SUPERSET_WEBSERVER_TIMEOUT = 120

@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "superset.fullname" . }}-init
+  labels:
+    {{- include "superset.labels" . | nindent 4 }}
+    app.kubernetes.io/component: init
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "superset.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: init
+    spec:
+      serviceAccountName: {{ include "superset.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: superset-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Running database migrations..."
+              superset db upgrade
+              echo "Creating admin user..."
+              superset fab create-admin \
+                --username "${SUPERSET_ADMIN_USERNAME}" \
+                --firstname "{{ .Values.admin.firstName }}" \
+                --lastname "{{ .Values.admin.lastName }}" \
+                --email "{{ .Values.admin.email }}" \
+                --password "${SUPERSET_ADMIN_PASSWORD}" || true
+              echo "Initializing Superset..."
+              superset init
+              echo "Init complete."
+          envFrom:
+            - secretRef:
+                name: {{ include "superset.fullname" . }}-secret
+          volumeMounts:
+            - name: config
+              mountPath: /app/pythonpath/superset_config.py
+              subPath: superset_config.py
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "superset.fullname" . }}-config

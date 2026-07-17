@@ -12,3 +12,7 @@ keywords:
 home: https://github.com/rh-ai-community-plugins/apache-superset
 sources:
   - https://github.com/rh-ai-community-plugins/apache-superset
+dependencies:
+  - name: superset
+    version: 0.1.0
+    condition: superset.enabled
