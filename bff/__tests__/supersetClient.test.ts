@@ -68,6 +68,24 @@ describe('SupersetClient', () => {
       );
     });
 
+    it('throws when the login endpoint returns an empty body', async () => {
+      const mockReq = new EventEmitter() as any;
+      mockReq.end = jest.fn();
+      mockReq.write = jest.fn();
+
+      const res = new EventEmitter() as any;
+      res.statusCode = 204;
+      process.nextTick(() => res.emit('end'));
+      mockedHttp.request.mockImplementation((_opts: any, callback: any) => {
+        callback(res);
+        return mockReq;
+      });
+
+      await expect(client.getAccessToken()).rejects.toThrow(
+        'Empty response from Superset login endpoint',
+      );
+    });
+
     it('concurrent calls share a single in-flight login request', async () => {
       setupMockRequest(200, JSON.stringify({ access_token: 'jwt-token-concurrent' }));
 
@@ -239,6 +257,34 @@ describe('SupersetClient', () => {
       // Exactly 4 calls: initial login + first attempt + re-login + retry
       expect(mockedHttp.request).toHaveBeenCalledTimes(4);
     });
+
+    it('throws when the guest token endpoint returns an empty body', async () => {
+      const mockReq = new EventEmitter() as any;
+      mockReq.end = jest.fn();
+      mockReq.write = jest.fn();
+
+      let callCount = 0;
+      mockedHttp.request.mockImplementation((_opts: any, callback: any) => {
+        callCount++;
+        if (callCount === 1) {
+          callback(createMockResponse(200, JSON.stringify({ access_token: 'admin-token' })));
+        } else {
+          const res = new EventEmitter() as any;
+          res.statusCode = 204;
+          process.nextTick(() => res.emit('end'));
+          callback(res);
+        }
+        return mockReq;
+      });
+
+      await expect(
+        client.generateGuestToken('dashboard-uuid', {
+          userName: 'testuser',
+          firstName: 'Test',
+          lastName: 'User',
+        }),
+      ).rejects.toThrow('Empty response from Superset guest token endpoint');
+    });
   });
 
   describe('listDashboards', () => {
@@ -390,6 +436,30 @@ describe('SupersetClient', () => {
       const retryCallArgs = mockedHttp.request.mock.calls[3][0] as any;
       expect(retryCallArgs.headers.Authorization).toBe('Bearer fresh-token');
     });
+
+    it('throws when the dashboard list endpoint returns an empty body', async () => {
+      const mockReq = new EventEmitter() as any;
+      mockReq.end = jest.fn();
+      mockReq.write = jest.fn();
+
+      let callCount = 0;
+      mockedHttp.request.mockImplementation((_opts: any, callback: any) => {
+        callCount++;
+        if (callCount === 1) {
+          callback(createMockResponse(200, JSON.stringify({ access_token: 'admin-token' })));
+        } else {
+          const res = new EventEmitter() as any;
+          res.statusCode = 204;
+          process.nextTick(() => res.emit('end'));
+          callback(res);
+        }
+        return mockReq;
+      });
+
+      await expect(client.listDashboards()).rejects.toThrow(
+        'Empty response from Superset dashboard list endpoint',
+      );
+    });
   });
 
   describe('getSupersetHealth', () => {
@@ -409,6 +479,24 @@ describe('SupersetClient', () => {
 
       mockedHttp.request.mockImplementation(() => {
         process.nextTick(() => mockReq.emit('error', new Error('ECONNREFUSED')));
+        return mockReq;
+      });
+
+      const health = await client.getSupersetHealth();
+
+      expect(health.healthy).toBe(false);
+    });
+
+    it('returns unhealthy when the health endpoint returns an empty body', async () => {
+      const mockReq = new EventEmitter() as any;
+      mockReq.end = jest.fn();
+      mockReq.write = jest.fn();
+
+      const res = new EventEmitter() as any;
+      res.statusCode = 204;
+      process.nextTick(() => res.emit('end'));
+      mockedHttp.request.mockImplementation((_opts: any, callback: any) => {
+        callback(res);
         return mockReq;
       });
 

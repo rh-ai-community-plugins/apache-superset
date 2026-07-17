@@ -55,14 +55,21 @@ export async function applyResource(
   const createPath = apiPath(apiVersion, kind, metadata.namespace);
 
   try {
-    return await k8sRequest<K8sResource>(token, createPath, {
+    const created = await k8sRequest<K8sResource>(token, createPath, {
       method: 'POST',
       body: resource,
     });
+    if (created === undefined) {
+      throw new Error(`Unexpected empty response from K8s API: POST ${createPath}`);
+    }
+    return created;
   } catch (err) {
     if (err instanceof K8sApiError && err.statusCode === 409) {
       const resourcePath = apiPath(apiVersion, kind, metadata.namespace, metadata.name);
       const existing = await k8sRequest<K8sResource>(token, resourcePath);
+      if (existing === undefined) {
+        throw new Error(`Unexpected empty response from K8s API: GET ${resourcePath}`);
+      }
       const updated = {
         ...resource,
         metadata: {
@@ -70,10 +77,14 @@ export async function applyResource(
           resourceVersion: existing.metadata.resourceVersion,
         },
       };
-      return k8sRequest<K8sResource>(token, resourcePath, {
+      const patched = await k8sRequest<K8sResource>(token, resourcePath, {
         method: 'PUT',
         body: updated,
       });
+      if (patched === undefined) {
+        throw new Error(`Unexpected empty response from K8s API: PUT ${resourcePath}`);
+      }
+      return patched;
     }
     throw err;
   }
@@ -90,7 +101,7 @@ export function deleteResource(
   return k8sRequest(token, path, { method: 'DELETE' });
 }
 
-export function getResource<T = K8sResource>(
+export async function getResource<T = K8sResource>(
   token: string,
   apiVersion: string,
   kind: string,
@@ -98,10 +109,14 @@ export function getResource<T = K8sResource>(
   name: string,
 ): Promise<T> {
   const path = apiPath(apiVersion, kind, namespace, name);
-  return k8sRequest<T>(token, path);
+  const result = await k8sRequest<T>(token, path);
+  if (result === undefined) {
+    throw new Error(`Unexpected empty response from K8s API: GET ${path}`);
+  }
+  return result;
 }
 
-export function listResources<T = K8sResource>(
+export async function listResources<T = K8sResource>(
   token: string,
   apiVersion: string,
   kind: string,
@@ -112,5 +127,9 @@ export function listResources<T = K8sResource>(
   if (labelSelector) {
     path += `?labelSelector=${encodeURIComponent(labelSelector)}`;
   }
-  return k8sRequest<K8sList<T>>(token, path);
+  const result = await k8sRequest<K8sList<T>>(token, path);
+  if (result === undefined) {
+    throw new Error(`Unexpected empty response from K8s API: GET ${path}`);
+  }
+  return result;
 }
