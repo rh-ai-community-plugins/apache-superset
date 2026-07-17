@@ -4,6 +4,10 @@ metadata:
   name: {{ include "superset.postgres.fullname" . }}-pv
   labels:
     {{- include "superset.postgres.labels" . | nindent 4 }}
+  {{- if .Values.postgres.persistence.keepOnUninstall }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
 spec:
   accessModes:
     - ReadWriteOnce
