@@ -876,8 +876,8 @@ superset:
   postgres:
     enabled: true
     image:
-      repository: bitnami/postgresql
-      tag: "16"
+      repository: registry.redhat.io/rhel9/postgresql-16
+      tag: "latest"
     persistence:
       size: 5Gi
       storageClass: ""   # Use cluster default
@@ -994,11 +994,12 @@ This requires cluster-admin privileges, which may not be available to plugin use
 
 ### PostgreSQL on OpenShift
 
-The Bitnami PostgreSQL image generally works with OpenShift:
+The sub-chart uses `registry.redhat.io/rhel9/postgresql-16`, Red Hat's official PostgreSQL image. This image is purpose-built for OpenShift:
 
-- Runs as non-root (UID 1001) by default
-- Uses `securityContext.runAsUser: 1001` in the chart
-- PVC permissions may need adjustment via `volumePermissions.enabled: true`
+- Runs as non-root and supports random UIDs (compatible with the `restricted` SCC out of the box)
+- Uses Red Hat-specific environment variable names: `POSTGRESQL_USER`, `POSTGRESQL_PASSWORD`, `POSTGRESQL_DATABASE` (not the upstream `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` convention used by the Docker Hub image)
+- Data directory is `/var/lib/pgsql/data` (not `/var/lib/postgresql/data`)
+- Readiness/liveness probes use `/usr/libexec/check-container` (provided by the image), not a generic `pg_isready` command
 
 ---
 
@@ -1216,7 +1217,7 @@ A feasibility analysis was conducted on five tools. Full findings are summarized
 - **License**: Apache 2.0 — fully permissive, zero legal risk
 - **Embedding**: React SDK (`@superset-ui/embedded-sdk`), guest tokens, row-level security — all free in OSS
 - **Auth**: Guest tokens via API, optional OIDC for full UI access
-- **OpenShift**: Nonroot variants available, Bitnami PostgreSQL works with restricted SCC
+- **OpenShift**: Nonroot variants available, Red Hat PostgreSQL (`registry.redhat.io/rhel9/postgresql-16`) works with restricted SCC
 - **Deployment**: 2 pods minimum (lightweight mode), 5 pods full mode. Official Helm chart.
 - **Project health**: Apache Foundation governance, very active development, large community
 - **Verdict**: Best overall. Selected for implementation.
