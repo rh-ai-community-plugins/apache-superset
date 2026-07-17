@@ -13,6 +13,7 @@ interface CachedToken {
 }
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export interface SupersetClientOptions {
   rejectUnauthorized?: boolean;
@@ -121,9 +122,9 @@ export class SupersetClient {
 
   async getSupersetHealth(): Promise<SupersetHealthResponse> {
     try {
-      const response = await this.request<string>('GET', '/health');
-      const healthy = response === 'OK' || (typeof response === 'object');
-      return { healthy, version: '4.1.1' };
+      const response = await this.request<unknown>('GET', '/health');
+      const healthy = response === 'OK' || (typeof response === 'object' && response !== null);
+      return { healthy };
     } catch {
       return { healthy: false };
     }
@@ -157,6 +158,7 @@ export class SupersetClient {
         path: url.pathname + url.search,
         method,
         headers,
+        timeout: REQUEST_TIMEOUT_MS,
       };
 
       if (isHttps) {
@@ -188,6 +190,11 @@ export class SupersetClient {
             );
           }
         });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error(`Superset API request timed out: ${method} ${path}`));
       });
 
       req.on('error', reject);

@@ -37,21 +37,46 @@ describe('applyResource', () => {
     expect(result).toEqual(configMap);
   });
 
-  it('falls back to PUT on 409 conflict', async () => {
+  it('falls back to GET then PUT on 409 conflict', async () => {
     const conflictError = new K8sApiError('conflict', 409, '{}');
+    const existingResource = {
+      ...configMap,
+      metadata: { ...configMap.metadata, resourceVersion: '12345' },
+    };
     mockedK8sRequest.mockRejectedValueOnce(conflictError);
-    mockedK8sRequest.mockResolvedValueOnce(configMap);
+    mockedK8sRequest.mockResolvedValueOnce(existingResource);
+    mockedK8sRequest.mockResolvedValueOnce(existingResource);
 
     const result = await applyResource('token', configMap);
 
-    expect(mockedK8sRequest).toHaveBeenCalledTimes(2);
+    expect(mockedK8sRequest).toHaveBeenCalledTimes(3);
+    // 1st: POST (create attempt)
+    expect(mockedK8sRequest).toHaveBeenNthCalledWith(
+      1,
+      'token',
+      '/api/v1/namespaces/my-ns/configmaps',
+      { method: 'POST', body: configMap },
+    );
+    // 2nd: GET (fetch existing for resourceVersion)
     expect(mockedK8sRequest).toHaveBeenNthCalledWith(
       2,
       'token',
       '/api/v1/namespaces/my-ns/configmaps/test-config',
-      { method: 'PUT', body: configMap },
     );
-    expect(result).toEqual(configMap);
+    // 3rd: PUT (update with resourceVersion)
+    expect(mockedK8sRequest).toHaveBeenNthCalledWith(
+      3,
+      'token',
+      '/api/v1/namespaces/my-ns/configmaps/test-config',
+      {
+        method: 'PUT',
+        body: {
+          ...configMap,
+          metadata: { ...configMap.metadata, resourceVersion: '12345' },
+        },
+      },
+    );
+    expect(result).toEqual(existingResource);
   });
 
   it('throws non-409 errors', async () => {

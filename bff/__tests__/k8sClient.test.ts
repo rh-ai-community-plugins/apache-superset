@@ -106,16 +106,9 @@ describe('k8sRequest', () => {
       return mockReq;
     });
 
-    await expect(k8sRequest('bad-token', '/api/v1/pods')).rejects.toThrow(
-      K8sApiError,
-    );
-
-    try {
-      await k8sRequest('bad-token', '/api/v1/pods');
-    } catch (err) {
-      expect(err).toBeInstanceOf(K8sApiError);
-      expect((err as K8sApiError).statusCode).toBe(403);
-    }
+    const err = await k8sRequest('bad-token', '/api/v1/pods').catch((e) => e);
+    expect(err).toBeInstanceOf(K8sApiError);
+    expect((err as K8sApiError).statusCode).toBe(403);
   });
 
   it('rejects on request error', async () => {

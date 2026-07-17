@@ -50,19 +50,27 @@ export async function applyResource(
   resource: K8sResource,
 ): Promise<K8sResource> {
   const { apiVersion, kind, metadata } = resource;
-  const path = apiPath(apiVersion, kind, metadata.namespace);
+  const createPath = apiPath(apiVersion, kind, metadata.namespace);
 
   try {
-    return await k8sRequest<K8sResource>(token, path, {
+    return await k8sRequest<K8sResource>(token, createPath, {
       method: 'POST',
       body: resource,
     });
   } catch (err) {
     if (err instanceof K8sApiError && err.statusCode === 409) {
-      const updatePath = apiPath(apiVersion, kind, metadata.namespace, metadata.name);
-      return k8sRequest<K8sResource>(token, updatePath, {
+      const resourcePath = apiPath(apiVersion, kind, metadata.namespace, metadata.name);
+      const existing = await k8sRequest<K8sResource>(token, resourcePath);
+      const updated = {
+        ...resource,
+        metadata: {
+          ...resource.metadata,
+          resourceVersion: existing.metadata.resourceVersion,
+        },
+      };
+      return k8sRequest<K8sResource>(token, resourcePath, {
         method: 'PUT',
-        body: resource,
+        body: updated,
       });
     }
     throw err;

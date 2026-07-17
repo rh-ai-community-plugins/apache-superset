@@ -30,14 +30,17 @@ export interface K8sRequestOptions {
   method?: HttpMethod;
   body?: unknown;
   contentType?: string;
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 export function k8sRequest<T = unknown>(
   token: string,
   path: string,
   options: K8sRequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, contentType = 'application/json' } = options;
+  const { method = 'GET', body, contentType = 'application/json', timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
   return new Promise((resolve, reject) => {
     const baseUrl = getK8sBaseUrl();
@@ -49,6 +52,7 @@ export function k8sRequest<T = unknown>(
       port: url.port,
       path: url.pathname + url.search,
       method,
+      timeout: timeoutMs,
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -97,6 +101,11 @@ export function k8sRequest<T = unknown>(
           );
         }
       });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`K8s API request timed out after ${timeoutMs}ms: ${method} ${path}`));
     });
 
     req.on('error', reject);

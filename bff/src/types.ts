@@ -80,16 +80,6 @@ export interface SupersetLoginResponse {
   access_token: string;
 }
 
-export interface SupersetDashboardListResponse {
-  result: Array<{
-    id: number;
-    dashboard_title: string;
-    url: string;
-    status: string;
-    result?: Array<{ uuid: string }>;
-  }>;
-}
-
 // --- User identity ---
 
 export interface UserInfo {

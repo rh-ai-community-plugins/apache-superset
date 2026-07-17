@@ -165,6 +165,7 @@ describe('SupersetClient', () => {
       const health = await client.getSupersetHealth();
 
       expect(health.healthy).toBe(true);
+      expect(health.version).toBeUndefined();
     });
 
     it('returns unhealthy on error', async () => {

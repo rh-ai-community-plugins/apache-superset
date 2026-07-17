@@ -443,19 +443,25 @@ function processRequired(
 ): string {
   // {{ required "msg" .Values.x | quote }}
   let result = template.replace(
-    /\{\{-?\s*required\s+"[^"]*"\s+\.Values\.([a-zA-Z0-9_.]+)\s*\|\s*quote\s*-?\}\}/g,
-    (_match, path: string) => {
-      const val = resolvePath(values, path);
-      return `"${val !== undefined ? String(val) : ''}"`;
+    /\{\{-?\s*required\s+"([^"]*)"\s+\.Values\.([a-zA-Z0-9_.]+)\s*\|\s*quote\s*-?\}\}/g,
+    (_match, msg: string, valuePath: string) => {
+      const val = resolvePath(values, valuePath);
+      if (val === undefined || val === null || val === '') {
+        throw new Error(`Helm render error: ${msg} (.Values.${valuePath})`);
+      }
+      return `"${String(val)}"`;
     },
   );
 
   // {{ required "msg" .Values.x }}
   result = result.replace(
-    /\{\{-?\s*required\s+"[^"]*"\s+\.Values\.([a-zA-Z0-9_.]+)\s*-?\}\}/g,
-    (_match, path: string) => {
-      const val = resolvePath(values, path);
-      return val !== undefined ? String(val) : '';
+    /\{\{-?\s*required\s+"([^"]*)"\s+\.Values\.([a-zA-Z0-9_.]+)\s*-?\}\}/g,
+    (_match, msg: string, valuePath: string) => {
+      const val = resolvePath(values, valuePath);
+      if (val === undefined || val === null || val === '') {
+        throw new Error(`Helm render error: ${msg} (.Values.${valuePath})`);
+      }
+      return String(val);
     },
   );
 
