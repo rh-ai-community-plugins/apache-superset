@@ -15,4 +15,5 @@ sources:
 dependencies:
   - name: superset
     version: 0.1.0
+    repository: file://charts/superset
     condition: superset.enabled
