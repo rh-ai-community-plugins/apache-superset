@@ -38,6 +38,12 @@ postgres:
     repository: registry.redhat.io/rhel9/postgresql-16
     tag: "latest"
     pullPolicy: IfNotPresent
+  # password: PostgreSQL password for the 'superset' database user.
+  # CONSTRAINT: must contain only alphanumeric characters (A-Z, a-z, 0-9).
+  # The password is interpolated directly into the SQLAlchemy connection URI
+  # (postgresql+psycopg2://user:PASSWORD@host/db) without URL-encoding.
+  # Characters such as @, :, /, %, and # will make the URI malformed and
+  # prevent Superset from connecting to the database.
   password: ""
   database: superset
   user: superset
