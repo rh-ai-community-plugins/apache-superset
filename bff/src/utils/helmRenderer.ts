@@ -10,7 +10,8 @@ export function renderHelmTemplates(
   chartDir: string = DEFAULT_CHART_DIR,
 ): K8sResource[] {
   const resolved = path.resolve(chartDir);
-  if (!resolved.includes('chart/charts/')) {
+  const repoChartDir = path.resolve(__dirname, '../../../chart/charts');
+  if (!resolved.startsWith(repoChartDir + path.sep)) {
     throw new Error('chartDir must be within the chart/charts/ directory');
   }
 

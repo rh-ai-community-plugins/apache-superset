@@ -75,6 +75,26 @@ const TEST_VALUES = {
   },
 };
 
+describe('renderHelmTemplates — path traversal validation', () => {
+  it('rejects a path that contains chart/charts/ as a substring but is not under the repo chart dir', () => {
+    expect(() =>
+      renderHelmTemplates(
+        { releaseName: 'r', namespace: 'ns', values: {} },
+        '/tmp/attacker/chart/charts/evil',
+      ),
+    ).toThrow('chartDir must be within the chart/charts/ directory');
+  });
+
+  it('rejects paths outside the repo entirely', () => {
+    expect(() =>
+      renderHelmTemplates(
+        { releaseName: 'r', namespace: 'ns', values: {} },
+        '/tmp/evil',
+      ),
+    ).toThrow('chartDir must be within the chart/charts/ directory');
+  });
+});
+
 describe('renderHelmTemplates', () => {
   let resources: K8sResource[];
 
