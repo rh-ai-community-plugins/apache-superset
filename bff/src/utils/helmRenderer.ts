@@ -250,45 +250,102 @@ function processConditionals(
 
   // Process {{- if ... }}...{{- else }}...{{- end }} and {{- if ... }}...{{- end }}
   // Also handles with blocks: {{- with .Values.x }}...{{- end }}
+  // For `with` blocks, the body has bare `.field` references rebound to the with target.
+  // Innermost blocks are processed first, which naturally handles nested with scope stacks.
   while (safety++ < 50) {
-    // Match innermost if/with block (no nested if/with inside)
-    const ifMatch = result.match(
-      /\{\{-?\s*(?:if|with)\s+(.+?)\s*-?\}\}([\s\S]*?)(?:\{\{-?\s*else\s*-?\}\}([\s\S]*?))?\{\{-?\s*end\s*-?\}\}/,
+    // Match the truly innermost if/with block (body must not contain a nested
+    // {{- if / {{- with tag). The tempered greedy token ensures we always
+    // process leaf blocks first so that scope stacks resolve correctly.
+    const blockMatch = result.match(
+      /\{\{-?\s*(if|with)\s+(.+?)\s*-?\}\}((?:(?!\{\{-?\s*(?:if|with)\s)[\s\S])*?)(?:\{\{-?\s*else\s*-?\}\}((?:(?!\{\{-?\s*(?:if|with)\s)[\s\S])*?))?\{\{-?\s*end\s*-?\}\}/,
     );
-    if (!ifMatch) break;
+    if (!blockMatch) break;
 
-    const condition = ifMatch[1].trim();
-    const ifBody = ifMatch[2];
-    const elseBody = ifMatch[3] ?? '';
+    const keyword = blockMatch[1] as 'if' | 'with';
+    const condition = blockMatch[2].trim();
+    const ifBody = blockMatch[3];
+    const elseBody = blockMatch[4] ?? '';
 
-    const conditionValue = evaluateCondition(condition, values, helpers);
-    const replacement = conditionValue ? ifBody : elseBody;
-    result = result.replace(ifMatch[0], replacement);
+    const conditionValue = evaluateExpression(condition, values, helpers);
+    const conditionTruthy = isTruthy(conditionValue);
+
+    let replacement: string;
+    if (conditionTruthy) {
+      if (keyword === 'with' && typeof conditionValue === 'object' && conditionValue !== null) {
+        // Rebind `.field` references inside the block to the with target
+        replacement = applyWithScope(ifBody, conditionValue as Record<string, unknown>);
+      } else {
+        replacement = ifBody;
+      }
+    } else {
+      replacement = elseBody;
+    }
+
+    result = result.replace(blockMatch[0], replacement);
   }
 
   return result;
 }
 
-function evaluateCondition(
+/**
+ * Evaluates a Helm template condition expression and returns the resolved value.
+ * Used for both truthiness checks (if/with) and scope binding (with).
+ */
+function evaluateExpression(
   condition: string,
   values: Record<string, unknown>,
   helpers: TemplateHelpers,
-): boolean {
+): unknown {
   if (condition.startsWith('.Values.')) {
-    const val = resolvePath(values, condition.slice('.Values.'.length));
-    return isTruthy(val);
+    return resolvePath(values, condition.slice('.Values.'.length));
   }
-  if (condition.startsWith('.Values')) {
-    return isTruthy(values);
+  if (condition === '.Values') {
+    return values;
   }
   if (condition.startsWith('not ')) {
-    return !evaluateCondition(condition.slice(4).trim(), values, helpers);
+    const inner = evaluateExpression(condition.slice(4).trim(), values, helpers);
+    return !isTruthy(inner);
   }
   // Check for regexMatch or other function calls — treat as true (validation passes)
   if (condition.includes('regexMatch')) {
     return true;
   }
   return true;
+}
+
+
+/**
+ * Replaces bare `.field` template references inside a `with` block body using
+ * the provided scope object as the source of values.  Only top-level field
+ * lookups are supported (`.foo` → scope.foo); nested paths (`.foo.bar`) are
+ * not rebound because Helm itself only rebinds the top-level `.`.
+ *
+ * Skips references that begin with well-known Helm prefixes (.Values, .Release,
+ * .Chart) so that fully-qualified paths are left for the normal resolution
+ * passes that follow.
+ */
+function applyWithScope(body: string, scope: Record<string, unknown>): string {
+  let result = body;
+
+  // {{ .field | quote }} — bare dot field with quote pipe
+  result = result.replace(
+    /\{\{-?\s*\.((?!Values\b|Release\b|Chart\b)[a-zA-Z][a-zA-Z0-9_]*)\s*\|\s*quote\s*-?\}\}/g,
+    (_match, field: string) => {
+      const val = scope[field];
+      return `"${val !== undefined ? String(val) : ''}"`;
+    },
+  );
+
+  // {{ .field }} — bare dot field reference (no pipe)
+  result = result.replace(
+    /\{\{-?\s*\.((?!Values\b|Release\b|Chart\b)[a-zA-Z][a-zA-Z0-9_]*)\s*-?\}\}/g,
+    (_match, field: string) => {
+      const val = scope[field];
+      return val !== undefined ? String(val) : '';
+    },
+  );
+
+  return result;
 }
 
 function isTruthy(val: unknown): boolean {

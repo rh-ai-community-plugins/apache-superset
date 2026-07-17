@@ -352,3 +352,159 @@ data:
     expect(warnings).toHaveLength(0);
   });
 });
+
+describe('renderHelmTemplates — with scope rebinding', () => {
+  // Must live under chart/charts/ to pass the path-traversal guard
+  const chartDir = path.resolve(__dirname, '../../chart/charts/__tmp_with_scope_test__');
+
+  function writeTemplate(name: string, content: string): void {
+    fs.writeFileSync(path.join(chartDir, 'templates', name), content, 'utf8');
+  }
+
+  beforeAll(() => {
+    fs.mkdirSync(path.join(chartDir, 'templates'), { recursive: true });
+    fs.writeFileSync(
+      path.join(chartDir, 'Chart.yaml'),
+      'name: superset\nversion: 0.1.0\nappVersion: "4.1.1"\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(chartDir, 'values.yaml'),
+      'replicaCount: 1\n',
+      'utf8',
+    );
+  });
+
+  afterAll(() => {
+    fs.rmSync(chartDir, { recursive: true, force: true });
+  });
+
+  afterEach(() => {
+    for (const f of fs.readdirSync(path.join(chartDir, 'templates'))) {
+      fs.unlinkSync(path.join(chartDir, 'templates', f));
+    }
+  });
+
+  it('resolves bare .field references against the with target', () => {
+    writeTemplate('with-scope.yaml', `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: with-secret
+  namespace: ns
+stringData:
+  {{- with .Values.db }}
+  password: {{ .password }}
+  host: {{ .host }}
+  {{- end }}
+`);
+
+    const { resources, warnings } = renderHelmTemplates(
+      {
+        releaseName: 'r',
+        namespace: 'ns',
+        values: { db: { password: 'pg-secret', host: 'db.example.com' } },
+      },
+      chartDir,
+    );
+
+    expect(warnings).toHaveLength(0);
+    const secret = resources.find((r) => r.kind === 'Secret');
+    expect(secret).toBeDefined();
+    expect(secret!.stringData!['password']).toBe('pg-secret');
+    expect(secret!.stringData!['host']).toBe('db.example.com');
+  });
+
+  it('resolves bare .field | quote references against the with target', () => {
+    writeTemplate('with-quote.yaml', `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: with-cm
+  namespace: ns
+data:
+  {{- with .Values.config }}
+  key: {{ .value | quote }}
+  {{- end }}
+`);
+
+    const { resources } = renderHelmTemplates(
+      {
+        releaseName: 'r',
+        namespace: 'ns',
+        values: { config: { value: 'hello-world' } },
+      },
+      chartDir,
+    );
+
+    const cm = resources.find((r) => r.kind === 'ConfigMap');
+    expect(cm).toBeDefined();
+    expect(cm!.data!['key']).toBe('hello-world');
+  });
+
+  it('handles nested with blocks — each block rebinds its own scope', () => {
+    // Inner block uses a full .Values path so both scopes can be resolved
+    // independently during innermost-first processing.
+    writeTemplate('nested-with.yaml', `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nested-cm
+  namespace: ns
+data:
+  {{- with .Values.outer }}
+  outerField: {{ .outerValue }}
+  {{- with .Values.outer.inner }}
+  innerField: {{ .innerValue }}
+  {{- end }}
+  {{- end }}
+`);
+
+    const { resources, warnings } = renderHelmTemplates(
+      {
+        releaseName: 'r',
+        namespace: 'ns',
+        values: {
+          outer: {
+            outerValue: 'from-outer',
+            inner: {
+              innerValue: 'from-inner',
+            },
+          },
+        },
+      },
+      chartDir,
+    );
+
+    expect(warnings).toHaveLength(0);
+    const cm = resources.find((r) => r.kind === 'ConfigMap');
+    expect(cm).toBeDefined();
+    expect(cm!.data!['outerField']).toBe('from-outer');
+    expect(cm!.data!['innerField']).toBe('from-inner');
+  });
+
+  it('skips the with body when the target is falsy', () => {
+    writeTemplate('with-falsy.yaml', `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falsy-cm
+  namespace: ns
+data:
+  present: "yes"
+  {{- with .Values.missing }}
+  secret: {{ .password }}
+  {{- end }}
+`);
+
+    const { resources } = renderHelmTemplates(
+      { releaseName: 'r', namespace: 'ns', values: {} },
+      chartDir,
+    );
+
+    const cm = resources.find((r) => r.kind === 'ConfigMap');
+    expect(cm).toBeDefined();
+    expect(cm!.data!['present']).toBe('yes');
+    expect(cm!.data!['secret']).toBeUndefined();
+  });
+});
