@@ -67,6 +67,13 @@ export interface SupersetDashboard {
   thumbnailUrl?: string;
 }
 
+export interface DashboardListResult {
+  dashboards: SupersetDashboard[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface GuestTokenResponse {
   guestToken: string;
 }

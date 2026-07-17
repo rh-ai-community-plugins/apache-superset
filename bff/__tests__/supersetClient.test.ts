@@ -242,7 +242,7 @@ describe('SupersetClient', () => {
   });
 
   describe('listDashboards', () => {
-    it('returns transformed dashboard list', async () => {
+    it('returns transformed dashboard list with pagination metadata', async () => {
       const mockReq = new EventEmitter() as any;
       mockReq.end = jest.fn();
       mockReq.write = jest.fn();
@@ -254,6 +254,7 @@ describe('SupersetClient', () => {
           callback(createMockResponse(200, JSON.stringify({ access_token: 'admin-token' })));
         } else {
           callback(createMockResponse(200, JSON.stringify({
+            count: 2,
             result: [
               {
                 id: 1,
@@ -275,9 +276,9 @@ describe('SupersetClient', () => {
         return mockReq;
       });
 
-      const dashboards = await client.listDashboards();
+      const result = await client.listDashboards();
 
-      expect(dashboards).toEqual([
+      expect(result.dashboards).toEqual([
         {
           id: 1,
           title: 'Sales Dashboard',
@@ -295,6 +296,58 @@ describe('SupersetClient', () => {
           thumbnailUrl: undefined,
         },
       ]);
+      expect(result.totalCount).toBe(2);
+      expect(result.page).toBe(0);
+      expect(result.pageSize).toBe(100);
+    });
+
+    it('uses default page=0 and pageSize=100 in the query URL', async () => {
+      const mockReq = new EventEmitter() as any;
+      mockReq.end = jest.fn();
+      mockReq.write = jest.fn();
+
+      let callCount = 0;
+      mockedHttp.request.mockImplementation((_opts: any, callback: any) => {
+        callCount++;
+        if (callCount === 1) {
+          callback(createMockResponse(200, JSON.stringify({ access_token: 'admin-token' })));
+        } else {
+          callback(createMockResponse(200, JSON.stringify({ count: 0, result: [] })));
+        }
+        return mockReq;
+      });
+
+      await client.listDashboards();
+
+      const listCallArgs = mockedHttp.request.mock.calls[1][0] as any;
+      expect(listCallArgs.path).toContain('page:0');
+      expect(listCallArgs.path).toContain('page_size:100');
+    });
+
+    it('accepts explicit page and pageSize parameters', async () => {
+      const mockReq = new EventEmitter() as any;
+      mockReq.end = jest.fn();
+      mockReq.write = jest.fn();
+
+      let callCount = 0;
+      mockedHttp.request.mockImplementation((_opts: any, callback: any) => {
+        callCount++;
+        if (callCount === 1) {
+          callback(createMockResponse(200, JSON.stringify({ access_token: 'admin-token' })));
+        } else {
+          callback(createMockResponse(200, JSON.stringify({ count: 250, result: [] })));
+        }
+        return mockReq;
+      });
+
+      const result = await client.listDashboards(2, 50);
+
+      const listCallArgs = mockedHttp.request.mock.calls[1][0] as any;
+      expect(listCallArgs.path).toContain('page:2');
+      expect(listCallArgs.path).toContain('page_size:50');
+      expect(result.page).toBe(2);
+      expect(result.pageSize).toBe(50);
+      expect(result.totalCount).toBe(250);
     });
 
     it('retries listDashboards with a fresh token on 401', async () => {
@@ -321,7 +374,7 @@ describe('SupersetClient', () => {
             callback(createMockResponse(200, JSON.stringify({ access_token: 'fresh-token' })));
             break;
           case 4:
-            callback(createMockResponse(200, JSON.stringify({ result: [] })));
+            callback(createMockResponse(200, JSON.stringify({ count: 0, result: [] })));
             break;
           default:
             callback(createMockResponse(500, '{"message":"unexpected call"}'));
@@ -329,9 +382,10 @@ describe('SupersetClient', () => {
         return mockReq;
       });
 
-      const dashboards = await client.listDashboards();
+      const result = await client.listDashboards();
 
-      expect(dashboards).toEqual([]);
+      expect(result.dashboards).toEqual([]);
+      expect(result.totalCount).toBe(0);
       expect(mockedHttp.request).toHaveBeenCalledTimes(4);
       const retryCallArgs = mockedHttp.request.mock.calls[3][0] as any;
       expect(retryCallArgs.headers.Authorization).toBe('Bearer fresh-token');
