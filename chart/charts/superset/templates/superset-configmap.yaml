@@ -61,6 +61,6 @@ data:
     EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
 
     # --- Web server ---
-    SUPERSET_WEBSERVER_PORT = {{ .Values.port }}
+    SUPERSET_WEBSERVER_PORT = {{ .Values.port | int }}
     ROW_LIMIT = 50000
     SUPERSET_WEBSERVER_TIMEOUT = 120
