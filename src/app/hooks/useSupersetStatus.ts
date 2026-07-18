@@ -94,7 +94,7 @@ export function useSupersetStatus(namespace: string | null): UseSupersetStatusRe
 
     return () => {
       stoppedRef.current = true;
-      controller.abort();
+      controllerRef.current?.abort();
       clearTimeout(timerRef.current);
     };
   }, [namespace, startPoll]);
