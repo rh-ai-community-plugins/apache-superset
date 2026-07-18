@@ -1,8 +1,14 @@
 import express from 'express';
 import { getK8sBaseUrl } from './utils/k8sClient';
+import { authMiddleware } from './middleware/auth';
+import supersetDeployRouter from './routes/supersetDeploy';
+import supersetStatusRouter from './routes/supersetStatus';
+import supersetConfigRouter from './routes/supersetConfig';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
+
+app.use(express.json());
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -13,6 +19,10 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+app.use('/api/superset/deploy', authMiddleware, supersetDeployRouter);
+app.use('/api/superset/status', authMiddleware, supersetStatusRouter);
+app.use('/api/superset/config', authMiddleware, supersetConfigRouter);
 
 app.listen(PORT, () => {
   try {
