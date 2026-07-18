@@ -66,10 +66,17 @@ const EmbeddedDashboardsPage: React.FC = () => {
   }, [navigate]);
 
   if (embeddedId) {
-    if (statusLoading || !supersetDomain) {
+    if (statusLoading) {
       return (
         <PageSection hasBodyWrapper={false}>
           <Spinner aria-label="Loading Superset connection" />
+        </PageSection>
+      );
+    }
+    if (!supersetRunning || !supersetDomain) {
+      return (
+        <PageSection hasBodyWrapper={false}>
+          <NotRunningState />
         </PageSection>
       );
     }
