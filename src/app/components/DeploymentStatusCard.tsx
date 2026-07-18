@@ -32,6 +32,8 @@ export interface DeploymentStatusCardProps {
   onTeardown: () => void;
   onRetry: () => void;
   tearing?: boolean;
+  retrying?: boolean;
+  deployError?: string | null;
 }
 
 function readyCount(status: SupersetStatus): number {
@@ -47,6 +49,8 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
   onTeardown,
   onRetry,
   tearing,
+  retrying,
+  deployError,
 }) => {
   if (status.phase === 'deploying') {
     const ready = readyCount(status);
@@ -171,7 +175,13 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
             isInline
             actionLinks={
               <>
-                <Button variant="link" isInline onClick={onRetry}>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={onRetry}
+                  isLoading={retrying}
+                  isDisabled={retrying || tearing}
+                >
                   Retry
                 </Button>
                 <Button
@@ -180,7 +190,7 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
                   isDanger
                   onClick={onTeardown}
                   isLoading={tearing}
-                  isDisabled={tearing}
+                  isDisabled={tearing || retrying}
                 >
                   Tear down
                 </Button>
@@ -189,6 +199,16 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
           >
             {status.message || 'An error occurred during deployment.'}
           </Alert>
+          {deployError && (
+            <Alert
+              variant="danger"
+              title="Retry failed"
+              isInline
+              className="pf-v6-u-mt-sm"
+            >
+              {deployError}
+            </Alert>
+          )}
         </CardBody>
       </Card>
     );

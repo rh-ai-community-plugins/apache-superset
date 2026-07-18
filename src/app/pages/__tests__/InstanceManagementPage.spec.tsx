@@ -181,6 +181,44 @@ describe('InstanceManagementPage', () => {
     expect(screen.getByText('Init failed')).toBeInTheDocument();
   });
 
+  it('disables and shows loading on Retry button while retrying', () => {
+    (useSupersetStatus as jest.Mock).mockReturnValue({
+      status: { phase: 'error', healthy: false, message: 'Init failed' },
+      loading: false,
+      error: null,
+      refresh: mockRefresh,
+    });
+    (useSupersetDeployment as jest.Mock).mockReturnValue({
+      deploy: mockDeploy,
+      teardown: mockTeardown,
+      deploying: true,
+      tearing: false,
+      error: null,
+    });
+    render(<InstanceManagementPage />);
+    const retryBtn = screen.getByRole('button', { name: /retry/i });
+    expect(retryBtn).toBeDisabled();
+  });
+
+  it('shows deployError alert when a retry fails', () => {
+    (useSupersetStatus as jest.Mock).mockReturnValue({
+      status: { phase: 'error', healthy: false, message: 'Init failed' },
+      loading: false,
+      error: null,
+      refresh: mockRefresh,
+    });
+    (useSupersetDeployment as jest.Mock).mockReturnValue({
+      deploy: mockDeploy,
+      teardown: mockTeardown,
+      deploying: false,
+      tearing: false,
+      error: 'Network error during retry',
+    });
+    render(<InstanceManagementPage />);
+    expect(screen.getByText('Retry failed')).toBeInTheDocument();
+    expect(screen.getByText('Network error during retry')).toBeInTheDocument();
+  });
+
   it('shows page heading', () => {
     (useSupersetStatus as jest.Mock).mockReturnValue({
       status: null,

@@ -68,6 +68,8 @@ const InstanceManagementPage: React.FC = () => {
             onTeardown={() => setTeardownModalOpen(true)}
             onRetry={() => { if (selectedProject) handleDeploy(selectedProject); }}
             tearing={tearing}
+            retrying={deploying}
+            deployError={deployError}
           />
         ) : null}
       </PageSection>
