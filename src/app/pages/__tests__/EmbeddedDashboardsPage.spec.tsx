@@ -247,7 +247,7 @@ describe('EmbeddedDashboardsPage', () => {
       expect(screen.getByText('Open in Superset')).toBeInTheDocument();
     });
 
-    it('shows loading spinner when supersetDomain is not yet available', () => {
+    it('shows loading spinner while status is loading', () => {
       (useSupersetStatus as jest.Mock).mockReturnValue({
         status: null,
         loading: true,
@@ -256,6 +256,44 @@ describe('EmbeddedDashboardsPage', () => {
       });
       render(<EmbeddedDashboardsPage />);
       expect(screen.getByLabelText('Loading Superset connection')).toBeInTheDocument();
+    });
+
+    it('shows not-running state when status loaded but Superset is not running', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: { phase: 'not-deployed', healthy: false },
+        loading: false,
+        error: null,
+        refresh: jest.fn(),
+      });
+      render(<EmbeddedDashboardsPage />);
+      expect(screen.getByText('Superset is not running')).toBeInTheDocument();
+      expect(screen.getByText('Go to Instance Management')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading Superset connection')).not.toBeInTheDocument();
+    });
+
+    it('shows not-running state when status loaded but url is missing', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: { phase: 'running', healthy: false },
+        loading: false,
+        error: null,
+        refresh: jest.fn(),
+      });
+      render(<EmbeddedDashboardsPage />);
+      expect(screen.getByText('Superset is not running')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading Superset connection')).not.toBeInTheDocument();
+    });
+
+    it('navigates to instance page from not-running state in embed view', async () => {
+      const user = userEvent.setup();
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: { phase: 'not-deployed', healthy: false },
+        loading: false,
+        error: null,
+        refresh: jest.fn(),
+      });
+      render(<EmbeddedDashboardsPage />);
+      await user.click(screen.getByText('Go to Instance Management'));
+      expect(mockNavigate).toHaveBeenCalledWith('/instance');
     });
   });
 });
