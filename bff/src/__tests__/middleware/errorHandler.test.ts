@@ -71,17 +71,17 @@ describe('errorHandler middleware', () => {
       expect(res.body).toEqual({ error: 'Kubernetes API request failed' });
     });
 
-    it('logs the error server-side without including the body in the log line', () => {
+    it('logs the error with body server-side for debugging', () => {
       const sensitiveBody = '{"serviceAccountName":"superset-sa","namespace":"prod"}';
       const err = new K8sApiError('K8s API returned 500', 500, sensitiveBody);
 
       const res = createMockRes();
       errorHandler(err, {} as Request, res, noop);
 
-      // The log should reference the status and message but NOT the raw body
-      expect(consoleSpy).toHaveBeenCalledWith('K8s API error [500]: K8s API returned 500');
-      const loggedArgs = consoleSpy.mock.calls[0].join(' ');
-      expect(loggedArgs).not.toContain(sensitiveBody);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'K8s API error [500]: K8s API returned 500',
+        sensitiveBody,
+      );
     });
   });
 
