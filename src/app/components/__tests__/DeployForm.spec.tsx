@@ -82,6 +82,19 @@ describe('DeployForm', () => {
     expect(screen.getByRole('button', { name: /deploy superset/i })).toBeDisabled();
   });
 
+  it('disables deploy button when RBAC returns no create-verb results (vacuous truth guard)', () => {
+    // Results contain only non-create verbs — filtering to create-verb yields an empty array.
+    // Array.every() on an empty array is vacuously true, so without the length guard the
+    // button would be incorrectly enabled.
+    (useAccessReview as jest.Mock).mockReturnValue({
+      results: [{ verb: 'get', resource: 'deployments', group: 'apps', allowed: true }],
+      loading: false,
+      error: null,
+    });
+    render(<DeployForm {...defaultProps} />);
+    expect(screen.getByRole('button', { name: /deploy superset/i })).toBeDisabled();
+  });
+
   it('shows confirmation modal on deploy click', async () => {
     const user = userEvent.setup();
     render(<DeployForm {...defaultProps} />);
