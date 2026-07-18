@@ -18,6 +18,9 @@ export function useSupersetGuestToken(
     }
 
     const data = await response.json();
+    if (typeof data.guestToken !== 'string' || !data.guestToken) {
+      throw new Error('Invalid guest token response');
+    }
     return data.guestToken;
   }, [namespace, dashboardId]);
 }

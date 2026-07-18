@@ -62,8 +62,6 @@ export const DashboardList: React.FC<DashboardListProps> = ({
       {dashboards.map((dashboard) => (
         <Card
           key={dashboard.id}
-          isSelectable
-          isClickable
           data-testid={`dashboard-card-${dashboard.id}`}
         >
           <CardTitle>
@@ -73,6 +71,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                   variant="link"
                   isInline
                   onClick={() => onSelect(dashboard)}
+                  isDisabled={!dashboard.embeddedId}
                 >
                   <Truncate content={dashboard.title} />
                 </Button>

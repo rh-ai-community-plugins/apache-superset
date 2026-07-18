@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { embedDashboard } from '@superset-ui/embedded-sdk';
+import './SupersetDashboardEmbed.css';
 
 export interface SupersetDashboardEmbedProps {
   dashboardId: string;
@@ -18,6 +19,7 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
     const mount = mountRef.current;
     if (!mount) return;
 
+    let cancelled = false;
     let unmountFn: (() => void) | undefined;
 
     embedDashboard({
@@ -31,12 +33,17 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
         filters: { expanded: false },
       },
     }).then((dashboard) => {
-      unmountFn = dashboard.unmount;
+      if (cancelled) {
+        dashboard.unmount();
+      } else {
+        unmountFn = dashboard.unmount;
+      }
     });
 
     return () => {
+      cancelled = true;
       unmountFn?.();
-      if (mount) mount.innerHTML = '';
+      if (mount) mount.replaceChildren();
     };
   }, [dashboardId, supersetDomain, fetchGuestToken]);
 
@@ -44,7 +51,7 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
     <div
       ref={mountRef}
       data-testid="superset-embed-container"
-      style={{ width: '100%', height: '80vh' }}
+      className="pf-v6-u-w-100 superset-embed-container"
     />
   );
 };

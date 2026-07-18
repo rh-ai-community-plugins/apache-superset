@@ -31,10 +31,10 @@ export function useSupersetDashboards(
         }
         const data = await response.json();
         setDashboards(data.dashboards ?? []);
+        setLoading(false);
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
         setError(e instanceof Error ? e.message : 'Failed to load dashboards');
-      } finally {
         setLoading(false);
       }
     },

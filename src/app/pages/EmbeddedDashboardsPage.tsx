@@ -25,6 +25,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { DashboardList } from '~/app/components/DashboardList';
 import { SupersetDashboardEmbed } from '~/app/components/SupersetDashboardEmbed';
+import '~/app/components/SupersetDashboardEmbed.css';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useSupersetDashboards } from '~/app/hooks/useSupersetDashboards';
 import { useSupersetGuestToken } from '~/app/hooks/useSupersetGuestToken';
@@ -65,6 +66,13 @@ const EmbeddedDashboardsPage: React.FC = () => {
   }, [navigate]);
 
   if (embeddedId) {
+    if (statusLoading || !supersetDomain) {
+      return (
+        <PageSection hasBodyWrapper={false}>
+          <Spinner aria-label="Loading Superset connection" />
+        </PageSection>
+      );
+    }
     return (
       <EmbedView
         embeddedId={embeddedId}
@@ -161,7 +169,7 @@ const EmbedView: React.FC<EmbedViewProps> = ({
       <PageSection
         hasBodyWrapper={false}
         isFilled
-        style={fullscreen ? { position: 'fixed', inset: 0, zIndex: 1000, background: 'var(--pf-t--global--background--color--primary--default)' } : undefined}
+        className={fullscreen ? 'superset-fullscreen-overlay' : undefined}
       >
         {fullscreen && (
           <div className="pf-v6-u-mb-sm">

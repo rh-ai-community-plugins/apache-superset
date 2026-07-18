@@ -73,7 +73,7 @@ describe('DashboardList', () => {
     expect(screen.getByText('Not configured for embedding')).toBeInTheDocument();
   });
 
-  it('calls onSelect when dashboard title is clicked', async () => {
+  it('calls onSelect when embeddable dashboard title is clicked', async () => {
     const user = userEvent.setup();
     render(
       <DashboardList
@@ -83,5 +83,16 @@ describe('DashboardList', () => {
     );
     await user.click(screen.getByText('Sales Dashboard'));
     expect(onSelect).toHaveBeenCalledWith(dashboards[0]);
+  });
+
+  it('disables button for non-embeddable dashboards', () => {
+    render(
+      <DashboardList
+        dashboards={dashboards}
+        onSelect={onSelect}
+      />,
+    );
+    const analyticsBtn = screen.getByText('Analytics').closest('button');
+    expect(analyticsBtn).toBeDisabled();
   });
 });

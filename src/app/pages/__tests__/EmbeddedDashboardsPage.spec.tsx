@@ -246,5 +246,16 @@ describe('EmbeddedDashboardsPage', () => {
       render(<EmbeddedDashboardsPage />);
       expect(screen.getByText('Open in Superset')).toBeInTheDocument();
     });
+
+    it('shows loading spinner when supersetDomain is not yet available', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: null,
+        loading: true,
+        error: null,
+        refresh: jest.fn(),
+      });
+      render(<EmbeddedDashboardsPage />);
+      expect(screen.getByLabelText('Loading Superset connection')).toBeInTheDocument();
+    });
   });
 });
