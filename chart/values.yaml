@@ -117,6 +117,7 @@ bff:
     repository: quay.io/OWNER/apache-superset-bff
     tag: ""
     pullPolicy: IfNotPresent
+  chartDir: /opt/app-root/src/chart-templates/superset
   replicaCount: 1
   service:
     type: ClusterIP

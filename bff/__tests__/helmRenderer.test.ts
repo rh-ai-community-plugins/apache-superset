@@ -76,23 +76,69 @@ const TEST_VALUES = {
   },
 };
 
-describe('renderHelmTemplates — path traversal validation', () => {
-  it('rejects a path that contains chart/charts/ as a substring but is not under the repo chart dir', () => {
+describe('renderHelmTemplates — chartDir validation', () => {
+  it('rejects paths outside the allowed directories', () => {
     expect(() =>
       renderHelmTemplates(
         { releaseName: 'r', namespace: 'ns', values: {} },
         '/tmp/attacker/chart/charts/evil',
       ),
-    ).toThrow('chartDir must be within the chart/charts/ directory');
+    ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
   });
 
-  it('rejects paths outside the repo entirely', () => {
+  it('rejects arbitrary paths even if they exist', () => {
     expect(() =>
       renderHelmTemplates(
         { releaseName: 'r', namespace: 'ns', values: {} },
-        '/tmp/evil',
+        '/tmp',
       ),
-    ).toThrow('chartDir must be within the chart/charts/ directory');
+    ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
+  });
+
+  it('accepts a path matching SUPERSET_CHART_DIR', () => {
+    const original = process.env.SUPERSET_CHART_DIR;
+    process.env.SUPERSET_CHART_DIR = CHART_DIR;
+    try {
+      const { resources } = renderHelmTemplates(
+        { releaseName: 'r', namespace: 'ns', values: TEST_VALUES },
+        CHART_DIR,
+      );
+      expect(resources.length).toBeGreaterThan(0);
+    } finally {
+      if (original === undefined) delete process.env.SUPERSET_CHART_DIR;
+      else process.env.SUPERSET_CHART_DIR = original;
+    }
+  });
+
+  it('rejects a chartDir that lacks Chart.yaml', () => {
+    const tmpDir = path.resolve(__dirname, '../../chart/charts/__tmp_no_chart_yaml__');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    try {
+      expect(() =>
+        renderHelmTemplates(
+          { releaseName: 'r', namespace: 'ns', values: {} },
+          tmpDir,
+        ),
+      ).toThrow('chartDir does not contain a Chart.yaml');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
+
+  it('does not widen SUPERSET_CHART_DIR to subdirectories (exact match only)', () => {
+    const original = process.env.SUPERSET_CHART_DIR;
+    process.env.SUPERSET_CHART_DIR = '/opt/charts/my-chart';
+    try {
+      expect(() =>
+        renderHelmTemplates(
+          { releaseName: 'r', namespace: 'ns', values: {} },
+          '/opt/charts/my-chart/subdir',
+        ),
+      ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
+    } finally {
+      if (original === undefined) delete process.env.SUPERSET_CHART_DIR;
+      else process.env.SUPERSET_CHART_DIR = original;
+    }
   });
 });
 
@@ -260,7 +306,6 @@ describe('renderHelmTemplates', () => {
 });
 
 describe('renderHelmTemplates — warnings', () => {
-  // Must live under chart/charts/ to pass the path-traversal guard
   const chartDir = path.resolve(__dirname, '../../chart/charts/__tmp_warn_test__');
 
   function writeTemplate(name: string, content: string): void {
@@ -354,7 +399,6 @@ data:
 });
 
 describe('renderHelmTemplates — with scope rebinding', () => {
-  // Must live under chart/charts/ to pass the path-traversal guard
   const chartDir = path.resolve(__dirname, '../../chart/charts/__tmp_with_scope_test__');
 
   function writeTemplate(name: string, content: string): void {

@@ -3,7 +3,19 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { K8sResource, HelmRenderContext, HelmChartMeta } from '../types';
 
-export const DEFAULT_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
+const REPO_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
+
+export function getDefaultChartDir(): string {
+  return process.env.SUPERSET_CHART_DIR || REPO_CHART_DIR;
+}
+
+function isAllowedChartDir(resolved: string): boolean {
+  const repoChartsBase = path.resolve(__dirname, '../../../chart/charts');
+  if (resolved.startsWith(repoChartsBase + path.sep)) return true;
+  const envDir = process.env.SUPERSET_CHART_DIR;
+  if (envDir && resolved === path.resolve(envDir)) return true;
+  return false;
+}
 
 export interface HelmRenderResult {
   resources: K8sResource[];
@@ -12,12 +24,14 @@ export interface HelmRenderResult {
 
 export function renderHelmTemplates(
   context: HelmRenderContext,
-  chartDir: string = DEFAULT_CHART_DIR,
+  chartDir: string = getDefaultChartDir(),
 ): HelmRenderResult {
   const resolved = path.resolve(chartDir);
-  const repoChartDir = path.resolve(__dirname, '../../../chart/charts');
-  if (!resolved.startsWith(repoChartDir + path.sep)) {
-    throw new Error('chartDir must be within the chart/charts/ directory');
+  if (!isAllowedChartDir(resolved)) {
+    throw new Error('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
+  }
+  if (!fs.existsSync(path.join(resolved, 'Chart.yaml'))) {
+    throw new Error('chartDir does not contain a Chart.yaml');
   }
 
   const chartMeta = loadChartMeta(resolved);

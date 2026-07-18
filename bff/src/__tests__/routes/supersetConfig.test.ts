@@ -16,7 +16,7 @@ jest.mock('../../utils/routeUrl', () => ({
 }));
 
 jest.mock('../../utils/helmRenderer', () => ({
-  DEFAULT_CHART_DIR: '/mock/chart/dir',
+  getDefaultChartDir: () => '/mock/chart/dir',
   loadChartMeta: () => ({
     name: 'superset',
     version: '0.1.0',
@@ -122,7 +122,7 @@ describe('APP_VERSION fallback', () => {
 
     jest.isolateModules(() => {
       jest.doMock('../../utils/helmRenderer', () => ({
-        DEFAULT_CHART_DIR: '/nonexistent',
+        getDefaultChartDir: () => '/nonexistent',
         loadChartMeta: () => {
           throw new Error('ENOENT: no such file or directory');
         },
