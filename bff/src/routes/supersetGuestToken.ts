@@ -29,10 +29,13 @@ router.get('/', async (req: Request, res: Response) => {
 
   const namespace = (req.query.namespace as string).trim();
 
-  let creds;
-  try {
-    creds = await getAdminCredentials(token, namespace);
-  } catch (err) {
+  const [credsResult, userResult] = await Promise.allSettled([
+    getAdminCredentials(token, namespace),
+    getUserInfo(token),
+  ]);
+
+  if (credsResult.status === 'rejected') {
+    const err = credsResult.reason as unknown;
     if (isSecretNotFound(err)) {
       res.status(404).json({ error: 'Superset instance not found in this namespace' });
       return;
@@ -43,9 +46,24 @@ router.get('/', async (req: Request, res: Response) => {
     return;
   }
 
-  try {
-    const userInfo = await getUserInfo(token);
+  if (userResult.status === 'rejected') {
+    const err = userResult.reason as unknown;
+    if (err instanceof K8sApiError) {
+      const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
+      console.error(`User identity resolution error in namespace ${namespace}:`, err.message);
+      res.status(status).json({ error: 'Unable to resolve user identity' });
+      return;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`Guest token error in namespace ${namespace}:`, message);
+    res.status(500).json({ error: 'Internal server error generating guest token' });
+    return;
+  }
 
+  const creds = credsResult.value;
+  const userInfo = userResult.value;
+
+  try {
     const client = new SupersetClient(
       creds.supersetUrl,
       creds.username,
@@ -57,13 +75,6 @@ router.get('/', async (req: Request, res: Response) => {
     const response: GuestTokenResponse = { guestToken };
     res.json(response);
   } catch (err) {
-    if (err instanceof K8sApiError) {
-      const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
-      console.error(`User identity resolution error in namespace ${namespace}:`, err.message);
-      res.status(status).json({ error: 'Unable to resolve user identity' });
-      return;
-    }
-
     if (err instanceof SupersetApiError) {
       const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
       console.error(`Guest token Superset error in namespace ${namespace}:`, err.message);
