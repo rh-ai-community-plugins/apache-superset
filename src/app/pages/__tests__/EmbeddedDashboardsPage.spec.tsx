@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EmbeddedDashboardsPage from '../EmbeddedDashboardsPage';
+import { ROUTES } from '~/app/routes';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useSupersetDashboards } from '~/app/hooks/useSupersetDashboards';
 import { useSupersetGuestToken } from '~/app/hooks/useSupersetGuestToken';
@@ -101,7 +102,7 @@ describe('EmbeddedDashboardsPage', () => {
       });
       render(<EmbeddedDashboardsPage />);
       await user.click(screen.getByText('Go to Instance Management'));
-      expect(mockNavigate).toHaveBeenCalledWith('/instance');
+      expect(mockNavigate).toHaveBeenCalledWith(ROUTES.INSTANCE);
     });
 
     it('shows spinner while loading dashboards', () => {
@@ -231,7 +232,7 @@ describe('EmbeddedDashboardsPage', () => {
       const user = userEvent.setup();
       render(<EmbeddedDashboardsPage />);
       await user.click(screen.getByLabelText('Back to dashboard list'));
-      expect(mockNavigate).toHaveBeenCalledWith('/dashboards');
+      expect(mockNavigate).toHaveBeenCalledWith(ROUTES.DASHBOARDS);
     });
 
     it('shows fullscreen toggle', async () => {
@@ -293,7 +294,7 @@ describe('EmbeddedDashboardsPage', () => {
       });
       render(<EmbeddedDashboardsPage />);
       await user.click(screen.getByText('Go to Instance Management'));
-      expect(mockNavigate).toHaveBeenCalledWith('/instance');
+      expect(mockNavigate).toHaveBeenCalledWith(ROUTES.INSTANCE);
     });
   });
 });

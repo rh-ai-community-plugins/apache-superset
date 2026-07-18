@@ -22,6 +22,7 @@ import {
   SyncAltIcon,
 } from '@patternfly/react-icons';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ROUTES } from '~/app/routes';
 import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { DashboardList } from '~/app/components/DashboardList';
 import { SupersetDashboardEmbed } from '~/app/components/SupersetDashboardEmbed';
@@ -62,7 +63,7 @@ const EmbeddedDashboardsPage: React.FC = () => {
   );
 
   const handleBack = useCallback(() => {
-    navigate('/dashboards');
+    navigate(ROUTES.DASHBOARDS);
   }, [navigate]);
 
   if (embeddedId) {
@@ -289,7 +290,7 @@ const NotRunningState: React.FC = () => {
       <EmptyStateBody>
         Deploy a Superset instance before browsing dashboards.
       </EmptyStateBody>
-      <Button variant="primary" onClick={() => navigate('/instance')}>
+      <Button variant="primary" onClick={() => navigate(ROUTES.INSTANCE)}>
         Go to Instance Management
       </Button>
     </EmptyState>
