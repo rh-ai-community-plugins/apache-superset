@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { DeployResult, TeardownResult } from '~/app/types';
 
 interface UseSupersetDeploymentReturn {
-  deploy: (namespace: string, dashboardOrigin: string) => Promise<DeployResult>;
-  teardown: (namespace: string, force?: boolean) => Promise<TeardownResult>;
+  deploy: (namespace: string, dashboardOrigin: string) => Promise<DeployResult | undefined>;
+  teardown: (namespace: string, force?: boolean) => Promise<TeardownResult | undefined>;
   deploying: boolean;
   tearing: boolean;
   error: string | null;
@@ -15,7 +15,7 @@ export function useSupersetDeployment(): UseSupersetDeploymentReturn {
   const [error, setError] = useState<string | null>(null);
 
   const deploy = useCallback(
-    async (namespace: string, dashboardOrigin: string): Promise<DeployResult> => {
+    async (namespace: string, dashboardOrigin: string): Promise<DeployResult | undefined> => {
       setDeploying(true);
       setError(null);
       try {
@@ -26,13 +26,13 @@ export function useSupersetDeployment(): UseSupersetDeploymentReturn {
         });
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error || data.message || `Deploy failed: ${response.status}`);
+          setError(data.error || data.message || `Deploy failed: ${response.status}`);
+          return undefined;
         }
         return data as DeployResult;
       } catch (e) {
-        const message = e instanceof Error ? e.message : 'Deploy failed';
-        setError(message);
-        throw e;
+        setError(e instanceof Error ? e.message : 'Deploy failed');
+        return undefined;
       } finally {
         setDeploying(false);
       }
@@ -41,7 +41,7 @@ export function useSupersetDeployment(): UseSupersetDeploymentReturn {
   );
 
   const teardown = useCallback(
-    async (namespace: string, force = false): Promise<TeardownResult> => {
+    async (namespace: string, force = false): Promise<TeardownResult | undefined> => {
       setTearing(true);
       setError(null);
       try {
@@ -53,13 +53,13 @@ export function useSupersetDeployment(): UseSupersetDeploymentReturn {
         );
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error || data.message || `Teardown failed: ${response.status}`);
+          setError(data.error || data.message || `Teardown failed: ${response.status}`);
+          return undefined;
         }
         return data as TeardownResult;
       } catch (e) {
-        const message = e instanceof Error ? e.message : 'Teardown failed';
-        setError(message);
-        throw e;
+        setError(e instanceof Error ? e.message : 'Teardown failed');
+        return undefined;
       } finally {
         setTearing(false);
       }

@@ -1,11 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { DeployForm } from '../DeployForm';
+import { DeployForm, DeployFormProps } from '../DeployForm';
 import { useAccessReview } from '~/app/hooks/useAccessReview';
-import { useLastSelectedProject } from '~/app/hooks/useLastSelectedProject';
 
 jest.mock('~/app/hooks/useAccessReview');
-jest.mock('~/app/hooks/useLastSelectedProject');
 jest.mock('~/app/components/ProjectSelector', () => ({
   ProjectSelector: ({
     selectedProject,
@@ -36,10 +34,16 @@ const someDenied = [
 
 describe('DeployForm', () => {
   const onDeploy = jest.fn();
+  const onProjectSelect = jest.fn();
+
+  const defaultProps: DeployFormProps = {
+    selectedProject: 'test-ns',
+    onProjectSelect,
+    onDeploy,
+  };
 
   beforeEach(() => {
     jest.resetAllMocks();
-    (useLastSelectedProject as jest.Mock).mockReturnValue(['test-ns', jest.fn()]);
     (useAccessReview as jest.Mock).mockReturnValue({
       results: allAllowed,
       loading: false,
@@ -48,13 +52,13 @@ describe('DeployForm', () => {
   });
 
   it('renders the deploy form', () => {
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} />);
     expect(screen.getByTestId('deploy-form')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /deploy superset/i })).toBeInTheDocument();
   });
 
   it('enables deploy button when all permissions are allowed', () => {
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} />);
     expect(screen.getByRole('button', { name: /deploy superset/i })).toBeEnabled();
   });
 
@@ -64,24 +68,23 @@ describe('DeployForm', () => {
       loading: false,
       error: null,
     });
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} />);
     expect(screen.getByRole('button', { name: /deploy superset/i })).toBeDisabled();
   });
 
   it('disables deploy button when no project is selected', () => {
-    (useLastSelectedProject as jest.Mock).mockReturnValue([null, jest.fn()]);
     (useAccessReview as jest.Mock).mockReturnValue({
       results: [],
       loading: false,
       error: null,
     });
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} selectedProject={null} />);
     expect(screen.getByRole('button', { name: /deploy superset/i })).toBeDisabled();
   });
 
   it('shows confirmation modal on deploy click', async () => {
     const user = userEvent.setup();
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} />);
 
     await user.click(screen.getByRole('button', { name: /deploy superset/i }));
     expect(screen.getByRole('heading', { name: /deploy apache superset/i })).toBeInTheDocument();
@@ -90,7 +93,7 @@ describe('DeployForm', () => {
 
   it('calls onDeploy after confirmation', async () => {
     const user = userEvent.setup();
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} />);
 
     await user.click(screen.getByRole('button', { name: /deploy superset/i }));
     await user.click(screen.getByRole('button', { name: /confirm/i }));
@@ -103,17 +106,17 @@ describe('DeployForm', () => {
       loading: true,
       error: null,
     });
-    render(<DeployForm onDeploy={onDeploy} />);
+    render(<DeployForm {...defaultProps} />);
     expect(screen.getByLabelText('Checking permissions')).toBeInTheDocument();
   });
 
   it('displays error alert when error prop is set', () => {
-    render(<DeployForm onDeploy={onDeploy} error="Something went wrong" />);
+    render(<DeployForm {...defaultProps} error="Something went wrong" />);
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
   });
 
   it('disables deploy button while deploying', () => {
-    render(<DeployForm onDeploy={onDeploy} deploying />);
+    render(<DeployForm {...defaultProps} deploying />);
     expect(screen.getByRole('button', { name: /deploy superset/i })).toBeDisabled();
   });
 });

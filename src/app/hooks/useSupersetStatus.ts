@@ -16,6 +16,9 @@ export function useSupersetStatus(namespace: string | null): UseSupersetStatusRe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hasDataRef = useRef(false);
+  const controllerRef = useRef<AbortController>();
+  const stoppedRef = useRef(false);
 
   const fetchStatus = useCallback(
     async (signal?: AbortSignal): Promise<SupersetStatus | null> => {
@@ -32,62 +35,69 @@ export function useSupersetStatus(namespace: string | null): UseSupersetStatusRe
     [namespace],
   );
 
+  const startPoll = useCallback(
+    (controller: AbortController) => {
+      const poll = async () => {
+        if (stoppedRef.current) return;
+        try {
+          if (!hasDataRef.current) setLoading(true);
+          const data = await fetchStatus(controller.signal);
+          if (stoppedRef.current) return;
+          setStatus(data);
+          setError(null);
+          setLoading(false);
+          hasDataRef.current = true;
+
+          const interval =
+            data?.phase === 'deploying' ? POLL_INTERVAL_ACTIVE : POLL_INTERVAL_STABLE;
+          timerRef.current = setTimeout(poll, interval);
+        } catch (e) {
+          if (stoppedRef.current) return;
+          if (e instanceof DOMException && e.name === 'AbortError') return;
+          setError(e instanceof Error ? e.message : 'Status check failed');
+          setLoading(false);
+          timerRef.current = setTimeout(poll, POLL_INTERVAL_STABLE);
+        }
+      };
+      poll();
+    },
+    [fetchStatus],
+  );
+
   const refresh = useCallback(() => {
     if (!namespace) return;
+    clearTimeout(timerRef.current);
+    controllerRef.current?.abort();
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    stoppedRef.current = false;
+
     setLoading(true);
     setError(null);
-    fetchStatus()
-      .then((data) => {
-        setStatus(data);
-        setLoading(false);
-      })
-      .catch((e) => {
-        if (e instanceof DOMException && e.name === 'AbortError') return;
-        setError(e instanceof Error ? e.message : 'Status check failed');
-        setLoading(false);
-      });
-  }, [namespace, fetchStatus]);
+    startPoll(controller);
+  }, [namespace, startPoll]);
 
   useEffect(() => {
     if (!namespace) {
       setStatus(null);
       setError(null);
+      hasDataRef.current = false;
       return;
     }
 
+    stoppedRef.current = false;
     const controller = new AbortController();
-    let stopped = false;
+    controllerRef.current = controller;
 
-    const poll = async () => {
-      if (stopped) return;
-      try {
-        setLoading((prev) => (status === null ? true : prev));
-        const data = await fetchStatus(controller.signal);
-        if (stopped) return;
-        setStatus(data);
-        setError(null);
-        setLoading(false);
-
-        const interval =
-          data?.phase === 'deploying' ? POLL_INTERVAL_ACTIVE : POLL_INTERVAL_STABLE;
-        timerRef.current = setTimeout(poll, interval);
-      } catch (e) {
-        if (stopped) return;
-        if (e instanceof DOMException && e.name === 'AbortError') return;
-        setError(e instanceof Error ? e.message : 'Status check failed');
-        setLoading(false);
-        timerRef.current = setTimeout(poll, POLL_INTERVAL_STABLE);
-      }
-    };
-
-    poll();
+    startPoll(controller);
 
     return () => {
-      stopped = true;
+      stoppedRef.current = true;
       controller.abort();
       clearTimeout(timerRef.current);
     };
-  }, [namespace, fetchStatus]);
+  }, [namespace, startPoll]);
 
   return { status, loading, error, refresh };
 }

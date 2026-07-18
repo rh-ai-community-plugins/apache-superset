@@ -17,7 +17,7 @@ import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useLastSelectedProject } from '~/app/hooks/useLastSelectedProject';
 
 const InstanceManagementPage: React.FC = () => {
-  const [selectedProject] = useLastSelectedProject();
+  const [selectedProject, setSelectedProject] = useLastSelectedProject();
   const { status, loading: statusLoading, refresh } = useSupersetStatus(selectedProject);
   const { deploy, teardown, deploying, tearing, error: deployError } = useSupersetDeployment();
   const [teardownModalOpen, setTeardownModalOpen] = useState(false);
@@ -25,12 +25,8 @@ const InstanceManagementPage: React.FC = () => {
   const handleDeploy = useCallback(
     async (namespace: string) => {
       const origin = window.location.origin;
-      try {
-        await deploy(namespace, origin);
-        refresh();
-      } catch {
-        // error is surfaced via deployError
-      }
+      const result = await deploy(namespace, origin);
+      if (result) refresh();
     },
     [deploy, refresh],
   );
@@ -38,12 +34,8 @@ const InstanceManagementPage: React.FC = () => {
   const handleTeardown = useCallback(async () => {
     if (!selectedProject) return;
     setTeardownModalOpen(false);
-    try {
-      await teardown(selectedProject);
-      refresh();
-    } catch {
-      // error is surfaced via deployError
-    }
+    const result = await teardown(selectedProject);
+    if (result) refresh();
   }, [selectedProject, teardown, refresh]);
 
   const showDeployForm =
@@ -63,6 +55,8 @@ const InstanceManagementPage: React.FC = () => {
           <Spinner aria-label="Loading status" />
         ) : showDeployForm ? (
           <DeployForm
+            selectedProject={selectedProject}
+            onProjectSelect={setSelectedProject}
             onDeploy={handleDeploy}
             deploying={deploying}
             error={deployError}
@@ -72,7 +66,7 @@ const InstanceManagementPage: React.FC = () => {
             status={status}
             loading={statusLoading}
             onTeardown={() => setTeardownModalOpen(true)}
-            onRetry={() => handleDeploy(selectedProject!)}
+            onRetry={() => { if (selectedProject) handleDeploy(selectedProject); }}
             tearing={tearing}
           />
         ) : null}

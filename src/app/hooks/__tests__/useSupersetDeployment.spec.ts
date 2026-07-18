@@ -75,7 +75,7 @@ describe('useSupersetDeployment', () => {
       expect(result.current.deploying).toBe(false);
     });
 
-    it('should set error on failure', async () => {
+    it('should set error and return undefined on failure', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
         status: 500,
@@ -84,12 +84,12 @@ describe('useSupersetDeployment', () => {
 
       const { result } = renderHook(() => useSupersetDeployment());
 
+      let response: unknown;
       await act(async () => {
-        await expect(
-          result.current.deploy('ns', 'https://example.com'),
-        ).rejects.toThrow('Internal error');
+        response = await result.current.deploy('ns', 'https://example.com');
       });
 
+      expect(response).toBeUndefined();
       expect(result.current.error).toBe('Internal error');
       expect(result.current.deploying).toBe(false);
     });
@@ -141,7 +141,7 @@ describe('useSupersetDeployment', () => {
       );
     });
 
-    it('should set error on teardown failure', async () => {
+    it('should set error and return undefined on teardown failure', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
         status: 500,
@@ -150,12 +150,12 @@ describe('useSupersetDeployment', () => {
 
       const { result } = renderHook(() => useSupersetDeployment());
 
+      let response: unknown;
       await act(async () => {
-        await expect(result.current.teardown('ns')).rejects.toThrow(
-          'Teardown failed',
-        );
+        response = await result.current.teardown('ns');
       });
 
+      expect(response).toBeUndefined();
       expect(result.current.error).toBe('Teardown failed');
       expect(result.current.tearing).toBe(false);
     });

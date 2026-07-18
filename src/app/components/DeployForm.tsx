@@ -21,9 +21,10 @@ import {
 } from '@patternfly/react-icons';
 import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { useAccessReview, AccessReviewResult } from '~/app/hooks/useAccessReview';
-import { useLastSelectedProject } from '~/app/hooks/useLastSelectedProject';
 
 export interface DeployFormProps {
+  selectedProject: string | null;
+  onProjectSelect: (project: string | null) => void;
   onDeploy: (namespace: string) => void;
   deploying?: boolean;
   error?: string | null;
@@ -36,11 +37,12 @@ function hasRequiredPermissions(results: AccessReviewResult[]): boolean {
 }
 
 export const DeployForm: React.FC<DeployFormProps> = ({
+  selectedProject,
+  onProjectSelect,
   onDeploy,
   deploying,
   error,
 }) => {
-  const [selectedProject, setSelectedProject] = useLastSelectedProject();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { results: rbacResults, loading: rbacLoading } = useAccessReview(selectedProject);
 
@@ -73,7 +75,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({
           <FormGroup fieldId="project-selector" label="Select a project">
             <ProjectSelector
               selectedProject={selectedProject}
-              onSelect={setSelectedProject}
+              onSelect={onProjectSelect}
               isDisabled={deploying}
             />
           </FormGroup>

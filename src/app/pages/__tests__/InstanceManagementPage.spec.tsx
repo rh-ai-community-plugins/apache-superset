@@ -35,12 +35,14 @@ jest.mock('~/app/components/ProjectSelector', () => ({
 }));
 
 describe('InstanceManagementPage', () => {
-  const mockDeploy = jest.fn().mockResolvedValue({ message: 'ok' });
-  const mockTeardown = jest.fn().mockResolvedValue({ message: 'ok' });
+  let mockDeploy: jest.Mock;
+  let mockTeardown: jest.Mock;
   const mockRefresh = jest.fn();
 
   beforeEach(() => {
     jest.resetAllMocks();
+    mockDeploy = jest.fn().mockResolvedValue({ message: 'ok' });
+    mockTeardown = jest.fn().mockResolvedValue({ message: 'ok' });
     (useLastSelectedProject as jest.Mock).mockReturnValue(['test-ns', jest.fn()]);
     (useSupersetDeployment as jest.Mock).mockReturnValue({
       deploy: mockDeploy,
