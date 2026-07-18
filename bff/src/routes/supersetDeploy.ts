@@ -8,7 +8,7 @@ import { RELEASE_NAME, PART_OF_LABEL, validateNamespace } from '../utils/resourc
 
 const router = Router();
 
-const ORIGIN_REGEX = /^https?:\/\/[a-zA-Z0-9][a-zA-Z0-9._-]*(?::\d{1,5})?$/;
+const ORIGIN_REGEX = /^https?:\/\/[a-zA-Z0-9][a-zA-Z0-9._-]*(?::(\d{1,5}))?$/;
 
 function generateSecret(length: number): string {
   return crypto.randomBytes(length).toString('base64url').slice(0, length);
@@ -78,8 +78,17 @@ function validateDeployRequest(body: unknown): { valid: true; data: SupersetDepl
     return { valid: false, error: 'dashboardOrigin is required' };
   }
 
-  if (!ORIGIN_REGEX.test(dashboardOrigin.trim())) {
+  const originMatch = ORIGIN_REGEX.exec(dashboardOrigin.trim());
+  if (!originMatch) {
     return { valid: false, error: 'dashboardOrigin must be a valid HTTP(S) origin (e.g., https://dashboard.example.com)' };
+  }
+
+  const portStr = originMatch[1];
+  if (portStr !== undefined) {
+    const port = parseInt(portStr, 10);
+    if (port === 0 || port > 65535) {
+      return { valid: false, error: 'dashboardOrigin contains an invalid port number (must be 1–65535)' };
+    }
   }
 
   return {
