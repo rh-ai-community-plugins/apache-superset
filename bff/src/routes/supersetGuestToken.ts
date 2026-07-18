@@ -58,7 +58,8 @@ router.get('/', async (req: Request, res: Response) => {
   } catch (err) {
     if (err instanceof SupersetApiError) {
       const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
-      res.status(status).json({ error: `Superset API error: ${err.message}` });
+      console.error(`Guest token Superset error in namespace ${namespace}:`, err.message);
+      res.status(status).json({ error: 'Superset API request failed' });
       return;
     }
 

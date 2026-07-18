@@ -59,6 +59,16 @@ describe('getUserInfo', () => {
     expect(info.lastName).toBe('De La Croix');
   });
 
+  it('throws when metadata.name is missing', async () => {
+    mockK8sRequest.mockResolvedValue({
+      metadata: {},
+    });
+
+    await expect(getUserInfo('test-token')).rejects.toThrow(
+      'OpenShift User API response missing metadata.name',
+    );
+  });
+
   it('throws on empty API response', async () => {
     mockK8sRequest.mockResolvedValue(undefined);
 

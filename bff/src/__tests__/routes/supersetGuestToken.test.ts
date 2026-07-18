@@ -176,7 +176,7 @@ describe('GET /api/superset/guest-token', () => {
     const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(401);
-    expect(body.error).toContain('Superset API error');
+    expect(body.error).toBe('Superset API request failed');
   });
 
   it('returns 500 on unexpected errors', async () => {

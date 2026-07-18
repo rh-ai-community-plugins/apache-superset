@@ -18,8 +18,12 @@ router.get('/', async (req: Request, res: Response) => {
 
   const namespace = (req.query.namespace as string).trim();
 
-  const page = parseInt(req.query.page as string, 10) || 0;
-  const pageSize = Math.min(parseInt(req.query.pageSize as string, 10) || 100, 250);
+  const parsedPage = parseInt(req.query.page as string, 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 0;
+  const parsedPageSize = parseInt(req.query.pageSize as string, 10);
+  const pageSize = Number.isFinite(parsedPageSize) && parsedPageSize > 0
+    ? Math.min(parsedPageSize, 250)
+    : 100;
 
   try {
     const creds = await getAdminCredentials(token, namespace);
@@ -39,7 +43,8 @@ router.get('/', async (req: Request, res: Response) => {
     }
     if (err instanceof SupersetApiError) {
       const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
-      res.status(status).json({ error: `Superset API error: ${err.message}` });
+      console.error(`Dashboard list Superset error in namespace ${namespace}:`, err.message);
+      res.status(status).json({ error: 'Superset API request failed' });
       return;
     }
 

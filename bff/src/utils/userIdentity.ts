@@ -16,7 +16,10 @@ export async function getUserInfo(token: string): Promise<UserInfo> {
     throw new Error('Empty response from OpenShift User API');
   }
 
-  const userName = user.metadata?.name || 'unknown';
+  const userName = user.metadata?.name;
+  if (!userName) {
+    throw new Error('OpenShift User API response missing metadata.name');
+  }
   const fullName = user.fullName || '';
   const parts = fullName.split(/\s+/).filter(Boolean);
   const firstName = parts[0] || '';
