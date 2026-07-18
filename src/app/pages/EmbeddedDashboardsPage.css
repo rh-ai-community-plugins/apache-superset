@@ -3,4 +3,11 @@
   inset: 0;
   z-index: 1000;
   background: var(--pf-t--global--background--color--primary--default);
+  display: flex;
+  flex-direction: column;
+}
+
+.superset-fullscreen-overlay .superset-embed-container {
+  flex: 1;
+  height: auto;
 }
