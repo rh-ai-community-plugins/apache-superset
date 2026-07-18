@@ -415,6 +415,7 @@ describe('DELETE /api/superset/deploy', () => {
 
     expect(res.status).toBe(200);
     const body = res.body as Record<string, unknown>;
+    expect(body.message).toBe('Resources found but preserved by resource-policy');
     expect((body.deleted as Array<unknown>)).toHaveLength(0);
     expect(body.skipped).toEqual([{ kind: 'PersistentVolumeClaim', name: 'superset-postgres-pv' }]);
     expect(mockDeleteResource).not.toHaveBeenCalled();

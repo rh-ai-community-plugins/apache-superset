@@ -298,7 +298,11 @@ router.delete('/', async (req: Request, res: Response) => {
     }
 
     res.json({
-      message: deleted.length > 0 ? 'Teardown initiated' : 'No resources found',
+      message: deleted.length > 0
+        ? 'Teardown initiated'
+        : skipped.length > 0
+          ? 'Resources found but preserved by resource-policy'
+          : 'No resources found',
       namespace: ns,
       deleted,
       skipped: skipped.length > 0 ? skipped : undefined,
