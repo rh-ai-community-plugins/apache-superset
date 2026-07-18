@@ -36,6 +36,7 @@ export class EmbedErrorBoundary extends React.Component<Props, State> {
           titleText="Dashboard failed to render"
           icon={ExclamationCircleIcon}
         >
+          {/* Safe: React renders this as a text node, not HTML — no XSS risk */}
           <EmptyStateBody>
             {this.state.error?.message || 'An unexpected error occurred.'}
           </EmptyStateBody>
