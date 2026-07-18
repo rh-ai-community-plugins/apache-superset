@@ -54,6 +54,13 @@ function createApp() {
   return app;
 }
 
+function createAppNoToken() {
+  const app = express();
+  // Intentionally omit auth middleware — req.token remains undefined
+  app.use('/api/superset/status', supersetStatusRouter);
+  return app;
+}
+
 async function request(app: express.Express, path: string) {
   const http = await import('http');
   return new Promise<{ status: number; body: Record<string, unknown> }>((resolve, reject) => {
@@ -84,6 +91,14 @@ describe('GET /api/superset/status', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRouteUrl.mockResolvedValue(undefined);
+  });
+
+  it('returns 401 when token is missing', async () => {
+    const app = createAppNoToken();
+    const res = await request(app, '/api/superset/status?namespace=test-ns');
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Authentication required');
   });
 
   it('returns 400 when namespace is missing', async () => {

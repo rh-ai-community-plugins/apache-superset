@@ -5,6 +5,7 @@ import { K8sApiError } from '../utils/k8sClient';
 import { DEFAULT_CHART_DIR, loadChartMeta } from '../utils/helmRenderer';
 import { getSecretName, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
+import { requireToken } from '../utils/routeHelpers';
 
 const router = Router();
 
@@ -22,7 +23,8 @@ function getAppVersion(): string {
 const APP_VERSION = getAppVersion();
 
 router.get('/', async (req: Request, res: Response) => {
-  const token = req.token!;
+  const token = requireToken(req, res);
+  if (token === null) return;
 
   const nsError = validateNamespace(req.query.namespace);
   if (nsError) {

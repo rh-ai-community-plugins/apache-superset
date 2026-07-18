@@ -5,6 +5,7 @@ import { K8sApiError } from '../utils/k8sClient';
 import { SupersetClient } from '../utils/supersetClient';
 import { getDeploymentName, getPostgresDeploymentName, getSupersetServiceUrl, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
+import { requireToken } from '../utils/routeHelpers';
 
 const router = Router();
 
@@ -67,7 +68,8 @@ async function checkDeploymentStatus(
 }
 
 router.get('/', async (req: Request, res: Response) => {
-  const token = req.token!;
+  const token = requireToken(req, res);
+  if (token === null) return;
 
   const nsError = validateNamespace(req.query.namespace);
   if (nsError) {

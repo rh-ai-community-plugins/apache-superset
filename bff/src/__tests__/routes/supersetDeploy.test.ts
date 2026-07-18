@@ -49,6 +49,14 @@ function createApp() {
   return app;
 }
 
+function createAppNoToken() {
+  const app = express();
+  app.use(express.json());
+  // Intentionally omit auth middleware — req.token remains undefined
+  app.use('/api/superset/deploy', supersetDeployRouter);
+  return app;
+}
+
 async function request(app: express.Express, method: string, path: string, body?: unknown) {
   const http = await import('http');
   return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
@@ -91,6 +99,17 @@ async function request(app: express.Express, method: string, path: string, body?
 describe('POST /api/superset/deploy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('returns 401 when token is missing', async () => {
+    const app = createAppNoToken();
+    const res = await request(app, 'POST', '/api/superset/deploy', {
+      namespace: 'test-ns',
+      dashboardOrigin: 'https://dashboard.test',
+    });
+
+    expect(res.status).toBe(401);
+    expect((res.body as Record<string, unknown>).error).toBe('Authentication required');
   });
 
   it('returns 400 when namespace is missing', async () => {
@@ -307,6 +326,14 @@ describe('POST /api/superset/deploy', () => {
 describe('DELETE /api/superset/deploy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('returns 401 when token is missing', async () => {
+    const app = createAppNoToken();
+    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=test-ns');
+
+    expect(res.status).toBe(401);
+    expect((res.body as Record<string, unknown>).error).toBe('Authentication required');
   });
 
   it('returns 400 when namespace is missing', async () => {

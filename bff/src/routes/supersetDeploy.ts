@@ -5,6 +5,7 @@ import { renderHelmTemplates } from '../utils/helmRenderer';
 import { applyResource, listResources, deleteResource } from '../utils/k8sApply';
 import { k8sRequest, K8sApiError } from '../utils/k8sClient';
 import { RELEASE_NAME, TEARDOWN_LABEL_SELECTOR, validateNamespace } from '../utils/resourceNames';
+import { requireToken } from '../utils/routeHelpers';
 
 const router = Router();
 
@@ -110,7 +111,8 @@ function validateDeployRequest(body: unknown): { valid: true; data: SupersetDepl
 }
 
 router.post('/', async (req: Request, res: Response) => {
-  const token = req.token!;
+  const token = requireToken(req, res);
+  if (token === null) return;
 
   const validation = validateDeployRequest(req.body);
   if (!validation.valid) {
@@ -185,7 +187,8 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 router.delete('/', async (req: Request, res: Response) => {
-  const token = req.token!;
+  const token = requireToken(req, res);
+  if (token === null) return;
   const namespace = req.query.namespace;
 
   const nsError = validateNamespace(namespace);
