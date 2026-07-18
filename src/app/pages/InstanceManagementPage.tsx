@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Button,
   Card,
@@ -43,6 +43,21 @@ const InstanceManagementPage: React.FC = () => {
   const showDeployForm =
     !statusLoading && (!status || status.phase === 'not-deployed');
 
+  /** Concise status text for screen readers — only updates on meaningful transitions. */
+  const statusAnnouncement = useMemo(() => {
+    if (!status) return '';
+    switch (status.phase) {
+      case 'deploying':
+        return 'Deploying Superset';
+      case 'running':
+        return `Superset is running${status.healthy ? ' and healthy' : ''}`;
+      case 'error':
+        return `Deployment error: ${status.message || 'An error occurred during deployment'}`;
+      default:
+        return '';
+    }
+  }, [status?.phase, status?.healthy, status?.message]);
+
   return (
     <>
       <PageSection hasBodyWrapper={false}>
@@ -52,7 +67,15 @@ const InstanceManagementPage: React.FC = () => {
         </Content>
       </PageSection>
 
-      <PageSection hasBodyWrapper={false} aria-live="polite">
+      <PageSection hasBodyWrapper={false}>
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="pf-v6-u-screen-reader"
+        >
+          {statusAnnouncement}
+        </div>
         {statusLoading && !status ? (
           <Card aria-label="Loading status">
             <CardBody>
