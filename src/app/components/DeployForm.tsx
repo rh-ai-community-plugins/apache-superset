@@ -31,9 +31,8 @@ export interface DeployFormProps {
 }
 
 function hasRequiredPermissions(results: AccessReviewResult[]): boolean {
-  return results
-    .filter((r) => r.verb === 'create')
-    .every((r) => r.allowed);
+  const createResults = results.filter((r) => r.verb === 'create');
+  return createResults.length > 0 && createResults.every((r) => r.allowed);
 }
 
 export const DeployForm: React.FC<DeployFormProps> = ({
