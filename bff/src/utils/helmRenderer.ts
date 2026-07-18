@@ -3,7 +3,7 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { K8sResource, HelmRenderContext, HelmChartMeta } from '../types';
 
-const DEFAULT_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
+export const DEFAULT_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
 
 export interface HelmRenderResult {
   resources: K8sResource[];
@@ -59,7 +59,7 @@ export function renderHelmTemplates(
   return { resources, warnings };
 }
 
-function loadChartMeta(chartDir: string): HelmChartMeta {
+export function loadChartMeta(chartDir: string): HelmChartMeta {
   const chartYaml = fs.readFileSync(path.join(chartDir, 'Chart.yaml'), 'utf8');
   const chart = yaml.load(chartYaml) as Record<string, string>;
   return {

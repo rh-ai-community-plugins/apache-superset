@@ -75,7 +75,7 @@ export function k8sRequest<T = unknown>(
     ca,
     makeError: (statusCode, responseBody) =>
       new K8sApiError(
-        `K8s API returned ${statusCode}: ${responseBody}`,
+        `K8s API returned ${statusCode}`,
         statusCode,
         responseBody,
       ),
