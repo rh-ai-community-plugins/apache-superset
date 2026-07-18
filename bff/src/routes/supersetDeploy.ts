@@ -198,6 +198,7 @@ router.delete('/', async (req: Request, res: Response) => {
   }
 
   const ns = (namespace as string).trim();
+  const force = req.query.force === 'true';
 
   try {
     const allowed = await checkRbac(token, ns, 'delete');
@@ -217,6 +218,7 @@ router.delete('/', async (req: Request, res: Response) => {
     ];
 
     const deleted: Array<{ kind: string; name: string }> = [];
+    const skipped: Array<{ kind: string; name: string }> = [];
     const errors: string[] = [];
 
     // List all resource kinds in parallel (read-only, safe to fan out).
@@ -224,6 +226,7 @@ router.delete('/', async (req: Request, res: Response) => {
     const kindResults = await Promise.allSettled(
       kindsToDelete.map(async ({ apiVersion, kind }) => {
         const kindDeleted: Array<{ kind: string; name: string }> = [];
+        const kindSkipped: Array<{ kind: string; name: string }> = [];
         const kindErrors: string[] = [];
 
         let list;
@@ -240,15 +243,26 @@ router.delete('/', async (req: Request, res: Response) => {
           );
         } catch (err) {
           if (err instanceof K8sApiError && err.statusCode === 404) {
-            return { kindDeleted, kindErrors };
+            return { kindDeleted, kindSkipped, kindErrors };
           }
           const message = err instanceof Error ? err.message : String(err);
           kindErrors.push(`Failed to list ${kind} resources: ${message}`);
-          return { kindDeleted, kindErrors };
+          return { kindDeleted, kindSkipped, kindErrors };
+        }
+
+        // Separate resources into those to delete and those to skip.
+        // A resource with helm.sh/resource-policy: keep is skipped unless force=true.
+        const toDelete: K8sResource[] = [];
+        for (const resource of list.items) {
+          if (!force && resource.metadata.annotations?.['helm.sh/resource-policy'] === 'keep') {
+            kindSkipped.push({ kind, name: resource.metadata.name });
+          } else {
+            toDelete.push(resource);
+          }
         }
 
         const deleteResults = await Promise.allSettled(
-          list.items.map((resource) =>
+          toDelete.map((resource) =>
             deleteResource(token, apiVersion, kind, ns, resource.metadata.name)
               .then(() => ({ kind, name: resource.metadata.name })),
           ),
@@ -264,17 +278,18 @@ router.delete('/', async (req: Request, res: Response) => {
               continue;
             }
             const message = err instanceof Error ? err.message : String(err);
-            kindErrors.push(`Failed to delete ${kind}/${list.items[i].metadata.name}: ${message}`);
+            kindErrors.push(`Failed to delete ${kind}/${toDelete[i].metadata.name}: ${message}`);
           }
         }
 
-        return { kindDeleted, kindErrors };
+        return { kindDeleted, kindSkipped, kindErrors };
       }),
     );
 
     for (const result of kindResults) {
       if (result.status === 'fulfilled') {
         deleted.push(...result.value.kindDeleted);
+        skipped.push(...result.value.kindSkipped);
         errors.push(...result.value.kindErrors);
       } else {
         const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
@@ -283,9 +298,14 @@ router.delete('/', async (req: Request, res: Response) => {
     }
 
     res.json({
-      message: deleted.length > 0 ? 'Teardown initiated' : 'No resources found',
+      message: deleted.length > 0
+        ? 'Teardown initiated'
+        : skipped.length > 0
+          ? 'Resources found but preserved by resource-policy'
+          : 'No resources found',
       namespace: ns,
       deleted,
+      skipped: skipped.length > 0 ? skipped : undefined,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (err) {
