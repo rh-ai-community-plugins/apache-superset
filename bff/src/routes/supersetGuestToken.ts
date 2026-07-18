@@ -4,10 +4,8 @@ import { SupersetClient, SupersetApiError } from '../utils/supersetClient';
 import { getAdminCredentials, isSecretNotFound } from '../utils/secretReader';
 import { getUserInfo } from '../utils/userIdentity';
 import { K8sApiError } from '../utils/k8sClient';
-import { validateNamespace } from '../utils/resourceNames';
-import { requireToken } from '../utils/routeHelpers';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { validateNamespace, isValidUuid } from '../utils/resourceNames';
+import { requireToken, safeHttpStatus } from '../utils/routeHelpers';
 
 const router = Router();
 
@@ -22,7 +20,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   const dashboard = req.query.dashboard as string | undefined;
-  if (!dashboard || !UUID_REGEX.test(dashboard)) {
+  if (!dashboard || !isValidUuid(dashboard)) {
     res.status(400).json({ error: 'dashboard query parameter must be a valid UUID' });
     return;
   }
@@ -49,9 +47,8 @@ router.get('/', async (req: Request, res: Response) => {
   if (userResult.status === 'rejected') {
     const err = userResult.reason as unknown;
     if (err instanceof K8sApiError) {
-      const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
       console.error(`User identity resolution error in namespace ${namespace}:`, err.message);
-      res.status(status).json({ error: 'Unable to resolve user identity' });
+      res.status(safeHttpStatus(err.statusCode)).json({ error: 'Unable to resolve user identity' });
       return;
     }
     const message = err instanceof Error ? err.message : String(err);
@@ -76,9 +73,8 @@ router.get('/', async (req: Request, res: Response) => {
     res.json(response);
   } catch (err) {
     if (err instanceof SupersetApiError) {
-      const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
       console.error(`Guest token Superset error in namespace ${namespace}:`, err.message);
-      res.status(status).json({ error: 'Superset API request failed' });
+      res.status(safeHttpStatus(err.statusCode)).json({ error: 'Superset API request failed' });
       return;
     }
 

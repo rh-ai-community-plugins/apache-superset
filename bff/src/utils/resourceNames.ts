@@ -10,6 +10,23 @@ export function validateNamespace(ns: unknown): string | null {
   return null;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Returns true if `value` is a valid RFC 4122 UUID string (case-insensitive).
+ *
+ * @example
+ * ```ts
+ * if (!isValidUuid(req.query.dashboard as string)) {
+ *   res.status(400).json({ error: 'dashboard must be a valid UUID' });
+ *   return;
+ * }
+ * ```
+ */
+export function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
 export const RELEASE_NAME = 'superset';
 export const SUPERSET_PORT = 8088;
 export const PART_OF_LABEL = 'app.kubernetes.io/part-of=superset';

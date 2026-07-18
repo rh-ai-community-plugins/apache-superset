@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { SupersetClient, SupersetApiError } from '../utils/supersetClient';
 import { getAdminCredentials, isSecretNotFound } from '../utils/secretReader';
 import { validateNamespace } from '../utils/resourceNames';
-import { requireToken } from '../utils/routeHelpers';
+import { requireToken, safeHttpStatus } from '../utils/routeHelpers';
 
 const router = Router();
 
@@ -42,9 +42,8 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
     if (err instanceof SupersetApiError) {
-      const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
       console.error(`Dashboard list Superset error in namespace ${namespace}:`, err.message);
-      res.status(status).json({ error: 'Superset API request failed' });
+      res.status(safeHttpStatus(err.statusCode)).json({ error: 'Superset API request failed' });
       return;
     }
 
