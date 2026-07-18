@@ -1,7 +1,7 @@
 # --- Plugin identity (required) ---
 name: apache-superset                    # [PLUGIN-SPECIFIC] unique plugin identifier (kebab-case)
 displayName: Apache Superset             # [PLUGIN-SPECIFIC] human-readable name
-description: A reference implementation and scaffold plugin for the RHOAI Dashboard
+description: Community plugin that deploys Apache Superset on-demand and embeds dashboards inline within the RHOAI Dashboard
 version: 0.1.0
 
 # --- Maintainer (required) ---
@@ -53,12 +53,24 @@ remote:
         path: apacheSuperset/Icon         # [PLUGIN-SPECIFIC] {scope}/Icon
 
 # --- RBAC (required) ---
-# NOTE: The plugin itself requires no cluster roles at install time. However,
-# users of the Cluster Resources page need RBAC permissions for create/list/delete
-# on apps/deployments, core/services, core/configmaps, and core/secrets via the
-# dashboard's K8s API pass-through.
+# The plugin itself requires no cluster roles at install time. However, users
+# who deploy Superset instances need namespace-scoped RBAC permissions for
+# create/list/delete on the following resources (via the BFF's K8s API calls):
+#   - apps/deployments
+#   - core/services, core/configmaps, core/secrets, core/persistentvolumeclaims
+#   - core/serviceaccounts
+#   - route.openshift.io/routes
 rbac:
-  required_roles: []
+  required_roles:
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["create", "list", "delete"]
+    - apiGroups: [""]
+      resources: ["services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
+      verbs: ["create", "list", "get", "delete"]
+    - apiGroups: ["route.openshift.io"]
+      resources: ["routes"]
+      verbs: ["create", "list", "get", "delete"]
   cluster_roles: false
 
 # --- Support (optional) ---

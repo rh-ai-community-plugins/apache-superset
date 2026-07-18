@@ -76,23 +76,23 @@ const TEST_VALUES = {
   },
 };
 
-describe('renderHelmTemplates — path traversal validation', () => {
-  it('rejects a path that contains chart/charts/ as a substring but is not under the repo chart dir', () => {
+describe('renderHelmTemplates — chartDir validation', () => {
+  it('rejects a path that does not contain Chart.yaml', () => {
     expect(() =>
       renderHelmTemplates(
         { releaseName: 'r', namespace: 'ns', values: {} },
         '/tmp/attacker/chart/charts/evil',
       ),
-    ).toThrow('chartDir must be within the chart/charts/ directory');
+    ).toThrow('chartDir does not contain a Chart.yaml');
   });
 
-  it('rejects paths outside the repo entirely', () => {
+  it('rejects paths that do not exist', () => {
     expect(() =>
       renderHelmTemplates(
         { releaseName: 'r', namespace: 'ns', values: {} },
         '/tmp/evil',
       ),
-    ).toThrow('chartDir must be within the chart/charts/ directory');
+    ).toThrow('chartDir does not contain a Chart.yaml');
   });
 });
 
@@ -260,7 +260,6 @@ describe('renderHelmTemplates', () => {
 });
 
 describe('renderHelmTemplates — warnings', () => {
-  // Must live under chart/charts/ to pass the path-traversal guard
   const chartDir = path.resolve(__dirname, '../../chart/charts/__tmp_warn_test__');
 
   function writeTemplate(name: string, content: string): void {
@@ -354,7 +353,6 @@ data:
 });
 
 describe('renderHelmTemplates — with scope rebinding', () => {
-  // Must live under chart/charts/ to pass the path-traversal guard
   const chartDir = path.resolve(__dirname, '../../chart/charts/__tmp_with_scope_test__');
 
   function writeTemplate(name: string, content: string): void {

@@ -1,7 +1,7 @@
 {
   "name": "apache-superset",
   "version": "0.1.0",
-  "description": "A reference implementation and scaffold plugin for the RHOAI Dashboard",
+  "description": "RHOAI Dashboard community plugin that deploys Apache Superset on-demand and embeds dashboards inline",
   "private": true,
   "_comment_name": "[PLUGIN-SPECIFIC] package name — change to {your-plugin}",
   "_comment_mf": "[PLUGIN-SPECIFIC] module-federation.name — camelCase, must match webpack and plugin.yaml",

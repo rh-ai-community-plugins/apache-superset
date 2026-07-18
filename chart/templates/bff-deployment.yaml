@@ -30,6 +30,9 @@ spec:
               drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
+          env:
+            - name: SUPERSET_CHART_DIR
+              value: {{ .Values.bff.chartDir | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.bff.service.targetPort }}

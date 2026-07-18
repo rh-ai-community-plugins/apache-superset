@@ -97,10 +97,10 @@ You should now have **three processes** running:
 | Process | Port | Purpose |
 |---|---|---|
 | Dashboard container | 8080 | Host application, proxies to plugin and BFF |
-| BFF service | 3000 | Plugin backend (namespace summary aggregation) |
+| BFF service | 3000 | Plugin backend (Superset deployment, status, dashboards, guest tokens) |
 | Plugin dev server | 9500 | Plugin frontend (webpack dev server with HMR) |
 
-Open the dashboard URL in your browser. You should see the RHOAI Dashboard with your plugin loaded in the sidebar, including the Namespace Summary page under the Apache Superset section.
+Open the dashboard URL in your browser. You should see the RHOAI Dashboard with your plugin loaded in the sidebar, with Instance Management and Dashboards pages under the Apache Superset section.
 
 ### How it works
 
@@ -310,6 +310,58 @@ This project defaults to port **9500**. The port only matters if you run multipl
 
 ---
 
+## Running a Local Superset Instance
+
+To test the full deploy → embed flow locally without an OpenShift cluster, you can run Superset via Podman/Docker. This is optional — the plugin's Instance Management page deploys Superset into OpenShift namespaces; a local instance is only useful for developing against the Superset REST API and testing dashboard embedding.
+
+### Step 1: Start a local Superset
+
+```bash
+podman run -d --name superset \
+  -p 8088:8088 \
+  -e SUPERSET_SECRET_KEY=local-dev-secret-key \
+  apache/superset:4.1.1
+```
+
+### Step 2: Initialize and create admin user
+
+```bash
+podman exec -it superset superset db upgrade
+podman exec -it superset superset fab create-admin \
+  --username admin \
+  --firstname Admin \
+  --lastname User \
+  --email admin@localhost \
+  --password admin
+podman exec -it superset superset init
+```
+
+### Step 3: Enable embedded dashboards
+
+Create a `superset_config_extra.py` file to enable guest token authentication:
+
+```python
+FEATURE_FLAGS = {
+    "EMBEDDED_SUPERSET": True,
+}
+GUEST_ROLE_NAME = "Gamma"
+GUEST_TOKEN_JWT_SECRET = "local-jwt-secret"
+GUEST_TOKEN_JWT_EXP_SECONDS = 300
+```
+
+Mount it into the container by re-running with `-v ./superset_config_extra.py:/app/pythonpath/superset_config_extra.py:ro`.
+
+### Step 4: Create a test dashboard
+
+Open `http://localhost:8088` in your browser, log in with `admin`/`admin`, and create a dashboard. Note the dashboard UUID (visible in the URL when viewing a dashboard) — you can embed it via the plugin's Dashboards page.
+
+### Notes
+
+- The BFF discovers Superset's URL from K8s Service DNS or OpenShift Routes when running in-cluster. For local development, the BFF communicates with a Superset deployed into the cluster by the Instance Management page — a standalone local Superset is only for API development.
+- The Superset server image used in production (`quay.io/OWNER/apache-superset-server`) is a nonroot variant built from `Containerfile.superset` for OpenShift compatibility.
+
+---
+
 ## Troubleshooting
 
 ### Plugin does not appear in the dashboard sidebar
@@ -336,14 +388,14 @@ This project defaults to port **9500**. The port only matters if you run multipl
 - Ensure the plugin dev server is running (not just built)
 - Try a hard refresh (Ctrl+Shift+R) if the module cache is stale
 
-### BFF: "Failed to load namespace summary" with HTML parse error
+### BFF: HTML instead of JSON responses
 
 The frontend receives HTML instead of JSON. This means the request to `/apache-superset/api/*` is not being proxied to the BFF and is hitting the SPA fallback instead.
 
 - Ensure your `MODULE_FEDERATION_CONFIG` includes the `proxyService` block (see the config examples above)
 - Restart the dashboard after changing `MODULE_FEDERATION_CONFIG`
 
-### BFF: "Failed to fetch namespace summary: 502"
+### BFF: 502 errors
 
 The dashboard is correctly proxying to the BFF, but the BFF is returning an error.
 

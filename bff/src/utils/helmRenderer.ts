@@ -3,7 +3,8 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { K8sResource, HelmRenderContext, HelmChartMeta } from '../types';
 
-export const DEFAULT_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
+export const DEFAULT_CHART_DIR = process.env.SUPERSET_CHART_DIR
+  || path.resolve(__dirname, '../../../chart/charts/superset');
 
 export interface HelmRenderResult {
   resources: K8sResource[];
@@ -15,9 +16,8 @@ export function renderHelmTemplates(
   chartDir: string = DEFAULT_CHART_DIR,
 ): HelmRenderResult {
   const resolved = path.resolve(chartDir);
-  const repoChartDir = path.resolve(__dirname, '../../../chart/charts');
-  if (!resolved.startsWith(repoChartDir + path.sep)) {
-    throw new Error('chartDir must be within the chart/charts/ directory');
+  if (!fs.existsSync(path.join(resolved, 'Chart.yaml'))) {
+    throw new Error(`chartDir does not contain a Chart.yaml: ${resolved}`);
   }
 
   const chartMeta = loadChartMeta(resolved);

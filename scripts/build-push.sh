@@ -44,7 +44,7 @@ frontend_context="."
 
 bff_image_name="apache-superset-bff"
 bff_containerfile="bff/Containerfile"
-bff_context="bff/"
+bff_context="."
 
 superset_image_name="apache-superset-server"
 superset_containerfile="Containerfile.superset"
