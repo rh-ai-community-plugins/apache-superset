@@ -36,6 +36,10 @@ export interface DeploymentStatusCardProps {
   deployError?: string | null;
 }
 
+function isSafeUrl(url: string): boolean {
+  return url.startsWith('https://') || url.startsWith('http://');
+}
+
 function readyCount(status: SupersetStatus): number {
   let count = 0;
   if (status.resources?.superset?.ready) count++;
@@ -116,18 +120,22 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
               <DescriptionListGroup>
                 <DescriptionListTerm>URL</DescriptionListTerm>
                 <DescriptionListDescription>
-                  <Button
-                    variant="link"
-                    isInline
-                    component="a"
-                    href={status.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    icon={<ExternalLinkAltIcon />}
-                    iconPosition="end"
-                  >
-                    {status.url}
-                  </Button>
+                  {isSafeUrl(status.url) ? (
+                    <Button
+                      variant="link"
+                      isInline
+                      component="a"
+                      href={status.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      icon={<ExternalLinkAltIcon />}
+                      iconPosition="end"
+                    >
+                      {status.url}
+                    </Button>
+                  ) : (
+                    <span>{status.url}</span>
+                  )}
                 </DescriptionListDescription>
               </DescriptionListGroup>
             )}
