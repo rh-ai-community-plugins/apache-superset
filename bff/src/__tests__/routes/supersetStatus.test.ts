@@ -21,11 +21,18 @@ jest.mock('../../utils/routeUrl', () => ({
   getRouteUrl: jest.fn(),
 }));
 
-jest.mock('../../utils/supersetClient', () => ({
-  SupersetClient: jest.fn().mockImplementation(() => ({
+jest.mock('../../utils/supersetClient', () => {
+  const mockHealthyClient = {
     getSupersetHealth: jest.fn().mockResolvedValue({ healthy: true, version: '4.1.1' }),
-  })),
-}));
+  };
+  const MockSupersetClient = Object.assign(
+    jest.fn().mockImplementation(() => mockHealthyClient),
+    {
+      forHealthCheck: jest.fn().mockReturnValue(mockHealthyClient),
+    },
+  );
+  return { SupersetClient: MockSupersetClient };
+});
 
 import express from 'express';
 import supersetStatusRouter from '../../routes/supersetStatus';
@@ -201,9 +208,9 @@ describe('GET /api/superset/status', () => {
       };
     });
 
-    (SupersetClient as jest.Mock).mockImplementation(() => ({
+    (SupersetClient.forHealthCheck as jest.Mock).mockReturnValue({
       getSupersetHealth: jest.fn().mockResolvedValue({ healthy: false }),
-    }));
+    });
 
     const app = createApp();
     const res = await request(app, '/api/superset/status?namespace=test-ns');
