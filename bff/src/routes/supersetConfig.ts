@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { SupersetConfig, K8sResource } from '../types';
 import { getResource } from '../utils/k8sApply';
 import { K8sApiError } from '../utils/k8sClient';
-import { DEFAULT_CHART_DIR, loadChartMeta } from '../utils/helmRenderer';
+import { getDefaultChartDir, loadChartMeta } from '../utils/helmRenderer';
 import { getSecretName, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
 import { requireToken } from '../utils/routeHelpers';
@@ -11,7 +11,7 @@ const router = Router();
 
 function getAppVersion(): string {
   try {
-    return loadChartMeta(DEFAULT_CHART_DIR).appVersion;
+    return loadChartMeta(getDefaultChartDir()).appVersion;
   } catch {
     // In container environments, chart/ may not be available — fall back to package.json
     // (kept in sync by scripts/sync-chart-version.js).

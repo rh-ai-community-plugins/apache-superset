@@ -5,8 +5,9 @@ import { K8sResource, HelmRenderContext, HelmChartMeta } from '../types';
 
 const REPO_CHART_DIR = path.resolve(__dirname, '../../../chart/charts/superset');
 
-// Captured once at load time; isAllowedChartDir re-reads the env var on each call.
-export const DEFAULT_CHART_DIR = process.env.SUPERSET_CHART_DIR || REPO_CHART_DIR;
+export function getDefaultChartDir(): string {
+  return process.env.SUPERSET_CHART_DIR || REPO_CHART_DIR;
+}
 
 function isAllowedChartDir(resolved: string): boolean {
   const repoChartsBase = path.resolve(__dirname, '../../../chart/charts');
@@ -23,7 +24,7 @@ export interface HelmRenderResult {
 
 export function renderHelmTemplates(
   context: HelmRenderContext,
-  chartDir: string = DEFAULT_CHART_DIR,
+  chartDir: string = getDefaultChartDir(),
 ): HelmRenderResult {
   const resolved = path.resolve(chartDir);
   if (!isAllowedChartDir(resolved)) {
