@@ -279,9 +279,9 @@ const ListView: React.FC<ListViewProps> = ({
           {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => i).map((i) => (
             <Card key={i}>
               <CardBody>
-                <Skeleton fontSize="lg" width="70%" />
+                <Skeleton fontSize="lg" width="70%" screenreaderText="Loading dashboard title" />
                 <br />
-                <Skeleton width="40%" />
+                <Skeleton width="40%" screenreaderText="Loading dashboard details" />
               </CardBody>
             </Card>
           ))}
