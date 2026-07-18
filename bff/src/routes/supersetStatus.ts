@@ -29,7 +29,7 @@ async function checkDeploymentStatus(
   token: string,
   namespace: string,
   name: string,
-): Promise<{ ready: boolean; replicas?: number; readyReplicas?: number; message?: string }> {
+): Promise<{ ready: boolean; found: boolean; replicas?: number; readyReplicas?: number; message?: string }> {
   try {
     const deployment = await getResource<DeploymentStatus>(
       token,
@@ -53,13 +53,14 @@ async function checkDeploymentStatus(
 
     return {
       ready: readyReplicas >= replicas && replicas > 0,
+      found: true,
       replicas,
       readyReplicas,
       message,
     };
   } catch (err) {
     if (err instanceof K8sApiError && err.statusCode === 404) {
-      return { ready: false, message: 'Deployment not found' };
+      return { ready: false, found: false, message: 'Deployment not found' };
     }
     throw err;
   }
@@ -82,10 +83,7 @@ router.get('/', async (req: Request, res: Response) => {
       checkDeploymentStatus(token, namespace, getPostgresDeploymentName()),
     ]);
 
-    if (
-      supersetDeployment.message === 'Deployment not found' &&
-      postgresDeployment.message === 'Deployment not found'
-    ) {
+    if (!supersetDeployment.found && !postgresDeployment.found) {
       const status: SupersetStatus = {
         phase: 'not-deployed',
         healthy: false,
