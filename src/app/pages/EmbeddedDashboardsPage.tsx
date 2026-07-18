@@ -2,12 +2,15 @@ import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Button,
+  Card,
+  CardBody,
   Content,
   ContentVariants,
   EmptyState,
   EmptyStateBody,
+  Gallery,
   PageSection,
-  Spinner,
+  Skeleton,
   Split,
   SplitItem,
   Toolbar,
@@ -26,6 +29,7 @@ import { ROUTES } from '~/app/routes';
 import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { DashboardList } from '~/app/components/DashboardList';
 import { SupersetDashboardEmbed } from '~/app/components/SupersetDashboardEmbed';
+import { EmbedErrorBoundary } from '~/app/components/EmbedErrorBoundary';
 import './EmbeddedDashboardsPage.css';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useSupersetDashboards } from '~/app/hooks/useSupersetDashboards';
@@ -70,7 +74,7 @@ const EmbeddedDashboardsPage: React.FC = () => {
     if (statusLoading) {
       return (
         <PageSection hasBodyWrapper={false}>
-          <Spinner aria-label="Loading Superset connection" />
+          <Skeleton screenreaderText="Loading Superset connection" height="400px" />
         </PageSection>
       );
     }
@@ -190,11 +194,13 @@ const EmbedView: React.FC<EmbedViewProps> = ({
             </Button>
           </div>
         )}
-        <SupersetDashboardEmbed
-          dashboardId={embeddedId}
-          supersetDomain={supersetDomain}
-          fetchGuestToken={fetchGuestToken}
-        />
+        <EmbedErrorBoundary>
+          <SupersetDashboardEmbed
+            dashboardId={embeddedId}
+            supersetDomain={supersetDomain}
+            fetchGuestToken={fetchGuestToken}
+          />
+        </EmbedErrorBoundary>
       </PageSection>
     </>
   );
@@ -263,11 +269,21 @@ const ListView: React.FC<ListViewProps> = ({
           </EmptyStateBody>
         </EmptyState>
       ) : statusLoading ? (
-        <Spinner aria-label="Checking Superset status" />
+        <Skeleton screenreaderText="Checking Superset status" height="100px" />
       ) : !supersetRunning ? (
         <NotRunningState />
       ) : dashboardsLoading ? (
-        <Spinner aria-label="Loading dashboards" />
+        <Gallery hasGutter minWidths={{ default: '250px' }} aria-label="Loading dashboards">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardBody>
+                <Skeleton fontSize="lg" width="70%" />
+                <br />
+                <Skeleton width="40%" />
+              </CardBody>
+            </Card>
+          ))}
+        </Gallery>
       ) : dashboardsError ? (
         <Alert variant="danger" title="Failed to load dashboards" isInline>
           {dashboardsError}

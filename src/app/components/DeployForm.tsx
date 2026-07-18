@@ -85,7 +85,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({
             {rbacLoading ? (
               <Spinner size="md" aria-label="Checking permissions" />
             ) : (
-              <List isPlain data-testid="rbac-results">
+              <List isPlain data-testid="rbac-results" aria-label="Required permissions">
                 {createResults.map((r) => (
                   <ListItem key={`${r.resource}-${r.verb}`}>
                     <Icon

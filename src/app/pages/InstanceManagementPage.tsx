@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import {
   Button,
+  Card,
+  CardBody,
   Content,
   ContentVariants,
   Modal,
@@ -8,7 +10,7 @@ import {
   ModalFooter,
   ModalHeader,
   PageSection,
-  Spinner,
+  Skeleton,
 } from '@patternfly/react-core';
 import { DeployForm } from '~/app/components/DeployForm';
 import { DeploymentStatusCard } from '~/app/components/DeploymentStatusCard';
@@ -50,9 +52,17 @@ const InstanceManagementPage: React.FC = () => {
         </Content>
       </PageSection>
 
-      <PageSection hasBodyWrapper={false}>
+      <PageSection hasBodyWrapper={false} aria-live="polite">
         {statusLoading && !status ? (
-          <Spinner aria-label="Loading status" />
+          <Card aria-label="Loading status">
+            <CardBody>
+              <Skeleton screenreaderText="Loading instance status" fontSize="2xl" width="40%" />
+              <br />
+              <Skeleton width="60%" />
+              <br />
+              <Skeleton width="30%" />
+            </CardBody>
+          </Card>
         ) : showDeployForm ? (
           <DeployForm
             selectedProject={selectedProject}

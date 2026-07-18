@@ -122,7 +122,7 @@ bff/
 4. Uses `Promise.allSettled` so a Superset health timeout doesn't mask the K8s readiness state
 5. Returns an aggregated status object: `{ deployed, ready, url, version, mode }`
 
-See `docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md` for the full list of planned BFF endpoints and their request/response shapes.
+See `docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md` for the full list of BFF endpoints and their request/response shapes.
 
 ### K8s Client
 

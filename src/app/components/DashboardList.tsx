@@ -58,7 +58,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   }
 
   return (
-    <Gallery hasGutter minWidths={{ default: '250px' }}>
+    <Gallery hasGutter minWidths={{ default: '250px' }} aria-label="Available dashboards">
       {dashboards.map((dashboard) => (
         <Card
           key={dashboard.id}

@@ -74,6 +74,8 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
         ref={mountRef}
         data-testid="superset-embed-container"
         className="pf-v6-u-w-100 superset-embed-container"
+        role="region"
+        aria-label="Embedded Superset dashboard"
       />
     </>
   );

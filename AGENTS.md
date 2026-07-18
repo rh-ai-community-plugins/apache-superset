@@ -53,41 +53,57 @@ The plugin exposes two remote modules to the RHOAI dashboard host via Webpack Mo
 
 Shared singletons (react, react-dom, react-router-dom, @patternfly/react-core, @openshift/dynamic-plugin-sdk) are provided by the host and not bundled into the plugin.
 
-### Pages (Planned)
+### Pages
 
-The plugin will have two main pages, routed under `/apache-superset/*`:
+The plugin has two pages, routed under `/apache-superset/*`:
 
-- **Instance Management page** — Deploy, monitor, and tear down the Superset instance. States: not deployed (with RBAC check), deploying (progress), running (health/status), error (retry/teardown).
-- **Embedded Dashboards page** — Browse available Superset dashboards and embed them inline via `@superset-ui/embedded-sdk`. Uses guest tokens for scoped, identity-aware access.
+- **Instance Management page** (`src/app/pages/InstanceManagementPage.tsx`) — Deploy, monitor, and tear down the Superset instance. States: not deployed (with RBAC check), deploying (progress bar), running (health/status/version), error (retry/teardown). Uses a confirmation modal for teardown with data-loss warning.
+- **Embedded Dashboards page** (`src/app/pages/EmbeddedDashboardsPage.tsx`) — Browse available Superset dashboards and embed them inline via `@superset-ui/embedded-sdk`. Supports fullscreen toggle, back navigation, and links to the Superset UI. Shows a "not running" state with link to Instance Management when Superset is not deployed.
 
-Currently, the codebase still contains the seed project's demo pages (User Info, Cluster Resources, Namespace Summary). These will be replaced during implementation.
+### Hooks
 
-### Custom Hooks (Planned)
+**Superset-specific hooks:**
 
-The following hooks will be implemented to support the Superset integration:
+- `useSupersetDeployment` — Deploy and teardown via BFF. Returns `deploy()`, `teardown()`, loading states, and error.
+- `useSupersetStatus` — Polls BFF for deployment status with adaptive intervals (10s while deploying, 30s when stable). Returns `status`, `loading`, `error`, `refresh()`.
+- `useSupersetDashboards` — Fetches dashboard list from BFF. Returns `dashboards[]`, `loading`, `error`, `refresh()`.
+- `useSupersetGuestToken` — Returns a `() => Promise<string>` callback for fetching scoped guest tokens for dashboard embedding.
 
-- `useSupersetDeployment` — Deploy/teardown/status via BFF
-- `useSupersetStatus` — Health check polling
-- `useSupersetDashboards` — List dashboards via BFF -> Superset API
-- `useSupersetGuestToken` — Fetch guest tokens for embedding
-- `useSupersetDataSources` — Manage data warehouse connections
+**Infrastructure hooks:**
 
-Currently, the codebase retains these hooks from the seed project: `useCurrentUser`, `useProjects`, `useFavoriteProjects`, `useAccessReview`, and `useLastSelectedProject`. Some will be kept (e.g., `useAccessReview` for RBAC checks, `useLastSelectedProject` for project context), others replaced or removed as Superset-specific hooks are implemented.
+- `useAccessReview` — SelfSubjectAccessReview checks for RBAC gating on the deploy form.
+- `useProjects` — Fetches OpenShift project list for the project selector.
+- `useFavoriteProjects` — localStorage-backed project favorites.
+- `useLastSelectedProject` — localStorage-backed project memory, shared across pages.
+- `useCurrentUser` — Fetches `/api/status` for user identity (available but not currently used by any page).
 
 ### BFF Service
 
-The `bff/` directory contains a standalone Express.js + TypeScript backend service. For this plugin, the BFF will:
+The `bff/` directory contains a standalone Express.js + TypeScript backend service that provides:
 
-1. Deploy/manage Superset K8s resources (Deployments, Services, ConfigMaps, Secrets, PVCs)
-2. Authenticate to the Superset REST API with admin credentials (from K8s Secret)
-3. Generate scoped guest tokens for embedded dashboard access (mapping RHOAI user identity)
-4. Proxy dashboard listing and data source management calls to the Superset API
+1. **Deploy/teardown** — Renders Helm templates in-process and applies/deletes Superset K8s resources (Deployments, Services, ConfigMaps, Secrets, PVCs, ServiceAccounts, Routes)
+2. **Status monitoring** — Checks Deployment readiness and Superset `/health` endpoint, returns aggregated phase
+3. **Guest token generation** — Authenticates to Superset REST API with admin credentials (from K8s Secret), maps RHOAI user identity to scoped guest tokens
+4. **Dashboard listing** — Proxies paginated dashboard list from Superset API with embeddedId resolution
+5. **Instance configuration** — Returns deployment mode, version, and embedding status
+
+API routes (all require Bearer token via auth middleware):
+
+- `POST /api/superset/deploy` — Deploy Superset into a namespace
+- `DELETE /api/superset/deploy` — Teardown resources (with optional `force` flag)
+- `GET /api/superset/status` — Check deployment phase and health
+- `GET /api/superset/config` — Get instance configuration
+- `GET /api/superset/dashboards` — List dashboards (paginated)
+- `GET /api/superset/guest-token` — Generate embedding guest token
+- `GET /api/health` — Health check (no auth)
 
 The dashboard proxies requests from `/apache-superset/api/*` to this service, forwarding the user's Bearer token. See `docs/architecture/BFF_PATTERN.md` for the general BFF pattern and `docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md` for the Superset-specific BFF design.
 
-### Key Dependencies (Planned)
+### Key Dependencies
 
 - `@superset-ui/embedded-sdk` — Official React SDK for embedding Superset dashboards via guest tokens
+- `@patternfly/react-core`, `@patternfly/react-icons`, `@patternfly/react-table` — PatternFly 6 UI components
+- `express`, `js-yaml` — BFF server and Helm template YAML parsing
 
 ### Entry Point Chain
 
@@ -117,7 +133,7 @@ Jest with `ts-jest` preset and `jsdom` environment (`jest.config.js`). `jest.set
 
 - **Frontend container**: Multi-stage build in `Containerfile` — UBI9 Node 22 builder → UBI9 Nginx 1.24 serving `dist/` on port 8080 as UID 1001. Nginx adds CORS header on `remoteEntry.js`.
 - **BFF container**: Multi-stage build in `bff/Containerfile` — UBI9 Node 22 builder → UBI9 Node 22 runtime on port 3000 as UID 1001.
-- **Helm chart**: `chart/` deploys to Kubernetes with Deployment + Service for both frontend and BFF. Frontend defaults to `quay.io/OWNER/apache-superset:latest`, BFF to `quay.io/OWNER/apache-superset-bff:latest`.
+- **Helm chart**: `chart/` deploys the plugin to Kubernetes with Deployment + Service for both frontend and BFF. Includes a `charts/superset/` sub-chart with templates for the on-demand Superset instance (Deployment, Service, ConfigMap, Secret, Route, PVC, ServiceAccount for both Superset and PostgreSQL). The sub-chart is rendered in-process by the BFF's helmRenderer, not installed by Helm directly.
 - **Superset instance**: Deployed on-demand by the BFF into the user's namespace. Lightweight mode: Superset (Gunicorn on port 8088) + PostgreSQL. Full mode adds Redis + Celery workers.
 
 ### CI/CD Workflows
@@ -131,8 +147,9 @@ Project documentation lives under `docs/` in semantic subfolders:
 
 ```text
 docs/architecture/   — Plugin system internals, BFF pattern, and Superset plugin architecture
-docs/development/    — Local dev setup and dashboard API reference
+docs/development/    — Local dev setup, dashboard API reference, and integration test plan
 docs/deployment/     — OpenShift deployment with Helm and dashboard registration
+docs/project/        — Implementation project plan (historical reference)
 ```
 
 ## Key Conventions

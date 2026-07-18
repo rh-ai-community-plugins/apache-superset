@@ -53,7 +53,7 @@ describe('InstanceManagementPage', () => {
     });
   });
 
-  it('shows loading spinner while checking status', () => {
+  it('shows loading skeleton while checking status', () => {
     (useSupersetStatus as jest.Mock).mockReturnValue({
       status: null,
       loading: true,
@@ -62,6 +62,7 @@ describe('InstanceManagementPage', () => {
     });
     render(<InstanceManagementPage />);
     expect(screen.getByLabelText('Loading status')).toBeInTheDocument();
+    expect(screen.getByText('Loading instance status')).toBeInTheDocument();
   });
 
   it('shows deploy form when not deployed', () => {
