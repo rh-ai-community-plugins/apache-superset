@@ -28,11 +28,22 @@ router.get('/', async (req: Request, res: Response) => {
 
   const namespace = (req.query.namespace as string).trim();
 
+  let creds;
   try {
-    const [creds, userInfo] = await Promise.all([
-      getAdminCredentials(token, namespace),
-      getUserInfo(token),
-    ]);
+    creds = await getAdminCredentials(token, namespace);
+  } catch (err) {
+    if (isSecretNotFound(err)) {
+      res.status(404).json({ error: 'Superset instance not found in this namespace' });
+      return;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`Credential read error in namespace ${namespace}:`, message);
+    res.status(500).json({ error: 'Internal server error generating guest token' });
+    return;
+  }
+
+  try {
+    const userInfo = await getUserInfo(token);
 
     const client = new SupersetClient(
       creds.supersetUrl,
@@ -45,10 +56,6 @@ router.get('/', async (req: Request, res: Response) => {
     const response: GuestTokenResponse = { guestToken };
     res.json(response);
   } catch (err) {
-    if (isSecretNotFound(err)) {
-      res.status(404).json({ error: 'Superset instance not found in this namespace' });
-      return;
-    }
     if (err instanceof SupersetApiError) {
       const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
       res.status(status).json({ error: `Superset API error: ${err.message}` });
