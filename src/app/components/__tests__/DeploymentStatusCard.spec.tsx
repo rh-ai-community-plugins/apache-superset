@@ -113,6 +113,40 @@ describe('DeploymentStatusCard', () => {
     expect(onTeardown).toHaveBeenCalledTimes(1);
   });
 
+  it('renders status.url as a link when it starts with https://', () => {
+    const status: SupersetStatus = {
+      phase: 'running',
+      healthy: true,
+      url: 'https://superset.example.com',
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+      />,
+    );
+    const link = screen.getByRole('link', { name: /superset\.example\.com/i });
+    expect(link).toHaveAttribute('href', 'https://superset.example.com');
+  });
+
+  it('renders status.url as plain text when it does not start with http(s)://', () => {
+    const status: SupersetStatus = {
+      phase: 'running',
+      healthy: true,
+      url: 'javascript:alert(1)',
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+      />,
+    );
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('disables teardown button while tearing', () => {
     const status: SupersetStatus = {
       phase: 'running',
