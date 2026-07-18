@@ -4,7 +4,7 @@ import { SupersetDeployRequest, K8sResource } from '../types';
 import { renderHelmTemplates } from '../utils/helmRenderer';
 import { applyResource, listResources, deleteResource } from '../utils/k8sApply';
 import { k8sRequest, K8sApiError } from '../utils/k8sClient';
-import { RELEASE_NAME, PART_OF_LABEL, validateNamespace } from '../utils/resourceNames';
+import { RELEASE_NAME, TEARDOWN_LABEL_SELECTOR, validateNamespace } from '../utils/resourceNames';
 
 const router = Router();
 
@@ -218,12 +218,15 @@ router.delete('/', async (req: Request, res: Response) => {
 
     for (const { apiVersion, kind } of kindsToDelete) {
       try {
+        // List resources by combined label selector that matches what the Helm renderer sets:
+        //   app.kubernetes.io/part-of=superset  — all plugin-managed resources
+        //   app.kubernetes.io/instance=<release> — scoped to this Superset release
         const list = await listResources<K8sResource>(
           token,
           apiVersion,
           kind,
           ns,
-          PART_OF_LABEL,
+          TEARDOWN_LABEL_SELECTOR,
         );
 
         for (const resource of list.items) {
