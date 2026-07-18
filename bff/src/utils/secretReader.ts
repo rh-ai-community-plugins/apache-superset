@@ -31,13 +31,12 @@ export async function getAdminCredentials(
     throw new Error('Superset admin password not found in Secret');
   }
 
-  const routeUrl = await getRouteUrl(token, namespace);
-  const supersetUrl = routeUrl || getSupersetServiceUrl(namespace);
+  const supersetUrl = await getSupersetUrl(token, namespace);
 
   return { username, password, supersetUrl };
 }
 
-export async function getSupersetUrl(
+async function getSupersetUrl(
   token: string,
   namespace: string,
 ): Promise<string> {
