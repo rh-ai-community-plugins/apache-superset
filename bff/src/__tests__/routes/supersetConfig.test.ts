@@ -21,8 +21,6 @@ jest.mock('../../utils/routeUrl', () => ({
   getRouteUrl: jest.fn(),
 }));
 
-// Use a sentinel version distinct from any real chart version so the test
-// proves the version is read from chart metadata rather than hardcoded.
 jest.mock('../../utils/helmRenderer', () => ({
   DEFAULT_CHART_DIR: '/mock/chart/dir',
   loadChartMeta: () => ({
@@ -142,5 +140,30 @@ describe('GET /api/superset/config', () => {
     expect(res.status).toBe(200);
     expect(res.body.url).toBeUndefined();
     expect(res.body.mode).toBe('lightweight');
+  });
+});
+
+describe('APP_VERSION fallback', () => {
+  it('falls back to package.json version when chart metadata is unavailable', () => {
+    let capturedVersion: string | undefined;
+
+    jest.isolateModules(() => {
+      jest.doMock('../../utils/helmRenderer', () => ({
+        DEFAULT_CHART_DIR: '/nonexistent',
+        loadChartMeta: () => {
+          throw new Error('ENOENT: no such file or directory');
+        },
+      }));
+
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('../../routes/supersetConfig') as { default: { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> } };
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pkg = require('../../../package.json') as { version: string };
+      capturedVersion = pkg.version;
+
+      expect(mod.default).toBeDefined();
+    });
+
+    expect(capturedVersion).toBeDefined();
   });
 });

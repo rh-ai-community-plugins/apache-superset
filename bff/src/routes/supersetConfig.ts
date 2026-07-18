@@ -8,7 +8,18 @@ import { getRouteUrl } from '../utils/routeUrl';
 
 const router = Router();
 
-const APP_VERSION = loadChartMeta(DEFAULT_CHART_DIR).appVersion;
+function getAppVersion(): string {
+  try {
+    return loadChartMeta(DEFAULT_CHART_DIR).appVersion;
+  } catch {
+    // In container environments, chart/ may not be available — fall back to package.json
+    // (kept in sync by scripts/sync-chart-version.js).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    return (require('../../package.json') as { version: string }).version;
+  }
+}
+
+const APP_VERSION = getAppVersion();
 
 router.get('/', async (req: Request, res: Response) => {
   const token = req.token!;
