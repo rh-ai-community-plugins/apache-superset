@@ -156,4 +156,39 @@ describe('useSupersetStatus', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('should abort the refresh controller when unmounted after refresh', async () => {
+    // The refresh() call replaces controllerRef.current with a new AbortController.
+    // The useEffect cleanup must abort controllerRef.current (not the stale closure
+    // variable) so that an in-flight fetch triggered by refresh() is cancelled.
+    let capturedSignal: AbortSignal | undefined;
+    global.fetch = jest.fn().mockImplementation((_url: string, opts: RequestInit) => {
+      capturedSignal = opts.signal as AbortSignal;
+      // Return a never-resolving promise to keep the fetch in-flight.
+      return new Promise(() => undefined);
+    });
+
+    const { result, unmount } = renderHook(() => useSupersetStatus('test-ns'));
+
+    // Wait for the initial fetch to start.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const signalBeforeRefresh = capturedSignal;
+
+    // Call refresh — this creates a new AbortController stored in controllerRef.
+    act(() => {
+      result.current.refresh();
+    });
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    const signalAfterRefresh = capturedSignal;
+
+    // The refresh signal must be a different object than the initial one.
+    expect(signalAfterRefresh).not.toBe(signalBeforeRefresh);
+    expect(signalAfterRefresh?.aborted).toBe(false);
+
+    // Unmounting must abort the refresh controller (not the stale initial one).
+    unmount();
+
+    expect(signalAfterRefresh?.aborted).toBe(true);
+  });
 });
