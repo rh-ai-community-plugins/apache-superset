@@ -3,6 +3,7 @@ import { GuestTokenResponse } from '../types';
 import { SupersetClient, SupersetApiError } from '../utils/supersetClient';
 import { getAdminCredentials, isSecretNotFound } from '../utils/secretReader';
 import { getUserInfo } from '../utils/userIdentity';
+import { K8sApiError } from '../utils/k8sClient';
 import { validateNamespace } from '../utils/resourceNames';
 import { requireToken } from '../utils/routeHelpers';
 
@@ -56,6 +57,13 @@ router.get('/', async (req: Request, res: Response) => {
     const response: GuestTokenResponse = { guestToken };
     res.json(response);
   } catch (err) {
+    if (err instanceof K8sApiError) {
+      const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
+      console.error(`User identity resolution error in namespace ${namespace}:`, err.message);
+      res.status(status).json({ error: 'Unable to resolve user identity' });
+      return;
+    }
+
     if (err instanceof SupersetApiError) {
       const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
       console.error(`Guest token Superset error in namespace ${namespace}:`, err.message);

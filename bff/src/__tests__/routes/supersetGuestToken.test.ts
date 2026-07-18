@@ -200,13 +200,32 @@ describe('GET /api/superset/guest-token', () => {
     expect(body.error).toContain('Internal server error');
   });
 
-  it('returns 500 when getUserInfo throws a K8sApiError', async () => {
+  it('returns upstream status when getUserInfo throws a K8sApiError', async () => {
     mockGetAdminCredentials.mockResolvedValue({
       username: 'admin',
       password: 'secret',
       supersetUrl: 'http://superset-svc.test-ns.svc.cluster.local:8088',
     });
     mockGetUserInfo.mockRejectedValue(new K8sApiError('Forbidden', 403, ''));
+
+    const app = createTestApp(supersetGuestTokenRouter, MOUNT_PATH);
+    const res = await testRequest(
+      app,
+      `/api/superset/guest-token?namespace=test-ns&dashboard=${VALID_DASHBOARD_UUID}`,
+    );
+    const body = res.body as Record<string, unknown>;
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe('Unable to resolve user identity');
+  });
+
+  it('returns 500 when getUserInfo throws a generic error', async () => {
+    mockGetAdminCredentials.mockResolvedValue({
+      username: 'admin',
+      password: 'secret',
+      supersetUrl: 'http://superset-svc.test-ns.svc.cluster.local:8088',
+    });
+    mockGetUserInfo.mockRejectedValue(new Error('Unexpected failure'));
 
     const app = createTestApp(supersetGuestTokenRouter, MOUNT_PATH);
     const res = await testRequest(
