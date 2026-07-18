@@ -216,37 +216,66 @@ router.delete('/', async (req: Request, res: Response) => {
     const deleted: Array<{ kind: string; name: string }> = [];
     const errors: string[] = [];
 
-    for (const { apiVersion, kind } of kindsToDelete) {
-      try {
-        // List resources by combined label selector that matches what the Helm renderer sets:
-        //   app.kubernetes.io/part-of=superset  — all plugin-managed resources
-        //   app.kubernetes.io/instance=<release> — scoped to this Superset release
-        const list = await listResources<K8sResource>(
-          token,
-          apiVersion,
-          kind,
-          ns,
-          TEARDOWN_LABEL_SELECTOR,
+    // List all resource kinds in parallel (read-only, safe to fan out).
+    // Within each kind, delete all matching resources in parallel (independent operations).
+    const kindResults = await Promise.allSettled(
+      kindsToDelete.map(async ({ apiVersion, kind }) => {
+        const kindDeleted: Array<{ kind: string; name: string }> = [];
+        const kindErrors: string[] = [];
+
+        let list;
+        try {
+          // List resources by combined label selector that matches what the Helm renderer sets:
+          //   app.kubernetes.io/part-of=superset  — all plugin-managed resources
+          //   app.kubernetes.io/instance=<release> — scoped to this Superset release
+          list = await listResources<K8sResource>(
+            token,
+            apiVersion,
+            kind,
+            ns,
+            TEARDOWN_LABEL_SELECTOR,
+          );
+        } catch (err) {
+          if (err instanceof K8sApiError && err.statusCode === 404) {
+            return { kindDeleted, kindErrors };
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          kindErrors.push(`Failed to list ${kind} resources: ${message}`);
+          return { kindDeleted, kindErrors };
+        }
+
+        const deleteResults = await Promise.allSettled(
+          list.items.map((resource) =>
+            deleteResource(token, apiVersion, kind, ns, resource.metadata.name)
+              .then(() => ({ kind, name: resource.metadata.name })),
+          ),
         );
 
-        for (const resource of list.items) {
-          try {
-            await deleteResource(token, apiVersion, kind, ns, resource.metadata.name);
-            deleted.push({ kind, name: resource.metadata.name });
-          } catch (err) {
+        for (let i = 0; i < deleteResults.length; i++) {
+          const result = deleteResults[i];
+          if (result.status === 'fulfilled') {
+            kindDeleted.push(result.value);
+          } else {
+            const err = result.reason as unknown;
             if (err instanceof K8sApiError && err.statusCode === 404) {
               continue;
             }
             const message = err instanceof Error ? err.message : String(err);
-            errors.push(`Failed to delete ${kind}/${resource.metadata.name}: ${message}`);
+            kindErrors.push(`Failed to delete ${kind}/${list.items[i].metadata.name}: ${message}`);
           }
         }
-      } catch (err) {
-        if (err instanceof K8sApiError && err.statusCode === 404) {
-          continue;
-        }
-        const message = err instanceof Error ? err.message : String(err);
-        errors.push(`Failed to list ${kind} resources: ${message}`);
+
+        return { kindDeleted, kindErrors };
+      }),
+    );
+
+    for (const result of kindResults) {
+      if (result.status === 'fulfilled') {
+        deleted.push(...result.value.kindDeleted);
+        errors.push(...result.value.kindErrors);
+      } else {
+        const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        errors.push(`Unexpected teardown error: ${message}`);
       }
     }
 
