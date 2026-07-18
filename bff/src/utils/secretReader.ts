@@ -36,10 +36,6 @@ export async function getAdminCredentials(
   return { username, password, supersetUrl };
 }
 
-// Internal helper: resolves the Superset URL by preferring the OpenShift Route
-// over the in-cluster service URL. Not exported — use getAdminCredentials when
-// credentials are also needed. Reserved for future routes that need the URL
-// alone (e.g. a lightweight status check endpoint).
 async function getSupersetUrl(
   token: string,
   namespace: string,
