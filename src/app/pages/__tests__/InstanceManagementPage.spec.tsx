@@ -227,7 +227,7 @@ describe('InstanceManagementPage', () => {
       error: 'Network error during retry',
     });
     render(<InstanceManagementPage />);
-    expect(screen.getByText('Retry failed')).toBeInTheDocument();
+    expect(screen.getByText('Deploy request failed')).toBeInTheDocument();
     expect(screen.getByText('Network error during retry')).toBeInTheDocument();
   });
 

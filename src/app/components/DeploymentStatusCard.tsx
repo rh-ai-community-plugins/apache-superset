@@ -210,7 +210,7 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
           {deployError && (
             <Alert
               variant="danger"
-              title="Retry failed"
+              title="Deploy request failed"
               isInline
               className="pf-v6-u-mt-sm"
             >
