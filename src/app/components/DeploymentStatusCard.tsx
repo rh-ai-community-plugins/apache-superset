@@ -81,7 +81,7 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
             aria-label="Deployment progress"
           />
           {status.message && (
-            <p style={{ marginTop: 'var(--pf-t--global--spacer--sm)' }}>
+            <p className="pf-v6-u-mt-sm">
               {status.message}
             </p>
           )}
@@ -158,7 +158,7 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
               </>
             )}
           </DescriptionList>
-          <div style={{ marginTop: 'var(--pf-t--global--spacer--md)' }}>
+          <div className="pf-v6-u-mt-md">
             <Button
               variant="danger"
               onClick={onTeardown}
