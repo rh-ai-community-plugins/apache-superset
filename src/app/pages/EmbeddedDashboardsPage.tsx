@@ -194,7 +194,7 @@ const EmbedView: React.FC<EmbedViewProps> = ({
             </Button>
           </div>
         )}
-        <EmbedErrorBoundary>
+        <EmbedErrorBoundary key={embeddedId}>
           <SupersetDashboardEmbed
             dashboardId={embeddedId}
             supersetDomain={supersetDomain}
