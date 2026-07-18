@@ -94,6 +94,37 @@ describe('renderHelmTemplates — chartDir validation', () => {
       ),
     ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
   });
+
+  it('accepts a path matching SUPERSET_CHART_DIR', () => {
+    const original = process.env.SUPERSET_CHART_DIR;
+    process.env.SUPERSET_CHART_DIR = CHART_DIR;
+    try {
+      const { resources } = renderHelmTemplates(
+        { releaseName: 'r', namespace: 'ns', values: TEST_VALUES },
+        CHART_DIR,
+      );
+      expect(resources.length).toBeGreaterThan(0);
+    } finally {
+      if (original === undefined) delete process.env.SUPERSET_CHART_DIR;
+      else process.env.SUPERSET_CHART_DIR = original;
+    }
+  });
+
+  it('does not widen SUPERSET_CHART_DIR to subdirectories (exact match only)', () => {
+    const original = process.env.SUPERSET_CHART_DIR;
+    process.env.SUPERSET_CHART_DIR = '/opt/charts/my-chart';
+    try {
+      expect(() =>
+        renderHelmTemplates(
+          { releaseName: 'r', namespace: 'ns', values: {} },
+          '/opt/charts/my-chart/subdir',
+        ),
+      ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
+    } finally {
+      if (original === undefined) delete process.env.SUPERSET_CHART_DIR;
+      else process.env.SUPERSET_CHART_DIR = original;
+    }
+  });
 });
 
 describe('renderHelmTemplates', () => {
