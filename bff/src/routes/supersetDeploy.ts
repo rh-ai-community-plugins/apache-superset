@@ -4,12 +4,11 @@ import { SupersetDeployRequest, K8sResource } from '../types';
 import { renderHelmTemplates } from '../utils/helmRenderer';
 import { applyResource, listResources, deleteResource } from '../utils/k8sApply';
 import { k8sRequest, K8sApiError } from '../utils/k8sClient';
-import { RELEASE_NAME, PART_OF_LABEL } from '../utils/resourceNames';
+import { RELEASE_NAME, PART_OF_LABEL, validateNamespace } from '../utils/resourceNames';
 
 const router = Router();
 
-const NAMESPACE_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-const ORIGIN_REGEX = /^https?:\/\/[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])*(:\d+)?$/;
+const ORIGIN_REGEX = /^https?:\/\/[a-zA-Z0-9][a-zA-Z0-9._-]*(?::\d{1,5})?$/;
 
 function generateSecret(length: number): string {
   return crypto.randomBytes(length).toString('base64url').slice(0, length);
@@ -61,16 +60,6 @@ async function checkRbac(token: string, namespace: string, verb: string): Promis
   } catch {
     return false;
   }
-}
-
-function validateNamespace(ns: unknown): string | null {
-  if (typeof ns !== 'string' || !ns.trim()) {
-    return 'namespace is required';
-  }
-  if (!NAMESPACE_REGEX.test(ns)) {
-    return 'namespace must be a valid Kubernetes namespace (lowercase alphanumeric and hyphens, max 63 chars)';
-  }
-  return null;
 }
 
 function validateDeployRequest(body: unknown): { valid: true; data: SupersetDeployRequest } | { valid: false; error: string } {

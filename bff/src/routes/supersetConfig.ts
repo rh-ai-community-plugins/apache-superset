@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { SupersetConfig, K8sResource } from '../types';
 import { getResource } from '../utils/k8sApply';
 import { K8sApiError } from '../utils/k8sClient';
-import { getSecretName } from '../utils/resourceNames';
+import { getSecretName, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
 
 const router = Router();
@@ -11,12 +11,14 @@ const APP_VERSION = '4.1.1';
 
 router.get('/', async (req: Request, res: Response) => {
   const token = req.token!;
-  const namespace = req.query.namespace;
 
-  if (typeof namespace !== 'string' || !namespace.trim()) {
-    res.status(400).json({ error: 'namespace query parameter is required' });
+  const nsError = validateNamespace(req.query.namespace);
+  if (nsError) {
+    res.status(400).json({ error: nsError });
     return;
   }
+
+  const namespace = (req.query.namespace as string).trim();
 
   try {
     const url = await getRouteUrl(token, namespace);
