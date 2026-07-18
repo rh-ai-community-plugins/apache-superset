@@ -110,6 +110,21 @@ describe('renderHelmTemplates — chartDir validation', () => {
     }
   });
 
+  it('rejects a chartDir that lacks Chart.yaml', () => {
+    const tmpDir = path.resolve(__dirname, '../../chart/charts/__tmp_no_chart_yaml__');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    try {
+      expect(() =>
+        renderHelmTemplates(
+          { releaseName: 'r', namespace: 'ns', values: {} },
+          tmpDir,
+        ),
+      ).toThrow('chartDir does not contain a Chart.yaml');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
+
   it('does not widen SUPERSET_CHART_DIR to subdirectories (exact match only)', () => {
     const original = process.env.SUPERSET_CHART_DIR;
     process.env.SUPERSET_CHART_DIR = '/opt/charts/my-chart';
