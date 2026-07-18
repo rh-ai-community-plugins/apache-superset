@@ -1,17 +1,11 @@
-jest.mock('../../utils/k8sClient', () => ({
-  k8sRequest: jest.fn(),
-  K8sApiError: class K8sApiError extends Error {
-    constructor(
-      message: string,
-      public readonly statusCode: number,
-      public readonly body: string,
-    ) {
-      super(message);
-      this.name = 'K8sApiError';
-    }
-  },
-  getK8sBaseUrl: () => 'https://k8s.test',
-}));
+jest.mock('../../utils/k8sClient', () => {
+  const actual = jest.requireActual<typeof import('../../utils/k8sClient')>('../../utils/k8sClient');
+  return {
+    k8sRequest: jest.fn(),
+    K8sApiError: actual.K8sApiError,
+    getK8sBaseUrl: () => 'https://k8s.test',
+  };
+});
 
 jest.mock('../../utils/k8sApply', () => ({
   getResource: jest.fn(),
@@ -30,57 +24,16 @@ jest.mock('../../utils/helmRenderer', () => ({
   }),
 }));
 
-import express from 'express';
 import supersetConfigRouter from '../../routes/supersetConfig';
 import { getResource } from '../../utils/k8sApply';
 import { K8sApiError } from '../../utils/k8sClient';
 import { getRouteUrl } from '../../utils/routeUrl';
+import { createTestApp, createTestAppNoToken, testRequest } from '../helpers/testServer';
 
 const mockGetResource = getResource as jest.MockedFunction<typeof getResource>;
 const mockGetRouteUrl = getRouteUrl as jest.MockedFunction<typeof getRouteUrl>;
 
-function createApp() {
-  const app = express();
-  app.use((req, _res, next) => {
-    req.token = 'test-token';
-    next();
-  });
-  app.use('/api/superset/config', supersetConfigRouter);
-  return app;
-}
-
-function createAppNoToken() {
-  const app = express();
-  // Intentionally omit auth middleware — req.token remains undefined
-  app.use('/api/superset/config', supersetConfigRouter);
-  return app;
-}
-
-async function request(app: express.Express, path: string) {
-  const http = await import('http');
-  return new Promise<{ status: number; body: Record<string, unknown> }>((resolve, reject) => {
-    const server = app.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === 'string') {
-        server.close();
-        reject(new Error('Failed to get server address'));
-        return;
-      }
-      const req = http.get(`http://127.0.0.1:${addr.port}${path}`, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          server.close();
-          resolve({ status: res.statusCode!, body: JSON.parse(data) });
-        });
-      });
-      req.on('error', (err) => {
-        server.close();
-        reject(err);
-      });
-    });
-  });
-}
+const MOUNT_PATH = '/api/superset/config';
 
 describe('GET /api/superset/config', () => {
   beforeEach(() => {
@@ -89,19 +42,21 @@ describe('GET /api/superset/config', () => {
   });
 
   it('returns 401 when token is missing', async () => {
-    const app = createAppNoToken();
-    const res = await request(app, '/api/superset/config?namespace=test-ns');
+    const app = createTestAppNoToken(supersetConfigRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/config?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(401);
-    expect(res.body.error).toBe('Authentication required');
+    expect(body.error).toBe('Authentication required');
   });
 
   it('returns 400 when namespace is missing', async () => {
-    const app = createApp();
-    const res = await request(app, '/api/superset/config');
+    const app = createTestApp(supersetConfigRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/config');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('namespace');
+    expect(body.error).toContain('namespace');
   });
 
   it('returns config with route URL when available', async () => {
@@ -116,15 +71,16 @@ describe('GET /api/superset/config', () => {
       },
     });
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/config?namespace=test-ns');
+    const app = createTestApp(supersetConfigRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/config?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.namespace).toBe('test-ns');
-    expect(res.body.url).toBe('https://superset.apps.test.com');
-    expect(res.body.mode).toBe('lightweight');
-    expect(res.body.version).toBe('99.0.0-test');
-    expect(res.body.embeddingEnabled).toBe(true);
+    expect(body.namespace).toBe('test-ns');
+    expect(body.url).toBe('https://superset.apps.test.com');
+    expect(body.mode).toBe('lightweight');
+    expect(body.version).toBe('99.0.0-test');
+    expect(body.embeddingEnabled).toBe(true);
   });
 
   it('returns 404 when secret is not found', async () => {
@@ -132,11 +88,12 @@ describe('GET /api/superset/config', () => {
       new K8sApiError('Not found', 404, ''),
     );
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/config?namespace=test-ns');
+    const app = createTestApp(supersetConfigRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/config?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toContain('not found');
+    expect(body.error).toContain('not found');
   });
 
   it('returns config without URL when route is not found', async () => {
@@ -149,12 +106,13 @@ describe('GET /api/superset/config', () => {
       },
     });
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/config?namespace=test-ns');
+    const app = createTestApp(supersetConfigRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/config?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.url).toBeUndefined();
-    expect(res.body.mode).toBe('lightweight');
+    expect(body.url).toBeUndefined();
+    expect(body.mode).toBe('lightweight');
   });
 });
 
