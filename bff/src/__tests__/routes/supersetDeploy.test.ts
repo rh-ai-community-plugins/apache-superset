@@ -134,6 +134,42 @@ describe('POST /api/superset/deploy', () => {
     expect((res.body as Record<string, unknown>).error).toContain('valid HTTP(S) origin');
   });
 
+  it.each([
+    ['port 0', 'https://dashboard.example.com:0'],
+    ['port 65536', 'https://dashboard.example.com:65536'],
+    ['port 99999', 'https://dashboard.example.com:99999'],
+  ])('returns 400 for dashboardOrigin with invalid %s', async (_label, dashboardOrigin) => {
+    const app = createApp();
+    const res = await request(app, 'POST', '/api/superset/deploy', {
+      namespace: 'test-ns',
+      dashboardOrigin,
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as Record<string, unknown>).error).toContain('invalid port number');
+  });
+
+  it.each([
+    ['port 443', 'https://dashboard.example.com:443'],
+    ['port 8080', 'https://dashboard.example.com:8080'],
+    ['port 65535', 'https://dashboard.example.com:65535'],
+    ['port 1', 'https://dashboard.example.com:1'],
+  ])('accepts dashboardOrigin with valid %s', async (_label, dashboardOrigin) => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: true },
+    });
+    mockRenderHelmTemplates.mockReturnValueOnce({ resources: [], warnings: [] });
+
+    const app = createApp();
+    const res = await request(app, 'POST', '/api/superset/deploy', {
+      namespace: 'test-ns',
+      dashboardOrigin,
+    });
+
+    // Should not be a 400 validation error — passes origin check
+    expect(res.status).not.toBe(400);
+  });
+
   it('returns 403 when RBAC check fails', async () => {
     mockK8sRequest.mockResolvedValueOnce({
       status: { allowed: false },
