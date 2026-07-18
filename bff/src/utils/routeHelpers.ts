@@ -22,3 +22,20 @@ export function requireToken(req: Request, res: Response): string | null {
   }
   return token;
 }
+
+/**
+ * Clamps an upstream HTTP status code to the 400–599 range.
+ *
+ * If `code` is already a valid client or server error status it is returned
+ * unchanged. Any value outside that range (e.g. a 200 that slipped through,
+ * or an out-of-range number) is replaced with 502 Bad Gateway, which signals
+ * that the problem lies with the upstream service rather than the caller.
+ *
+ * @example
+ * ```ts
+ * res.status(safeHttpStatus(err.statusCode)).json({ error: '...' });
+ * ```
+ */
+export function safeHttpStatus(code: number): number {
+  return code >= 400 && code < 600 ? code : 502;
+}
