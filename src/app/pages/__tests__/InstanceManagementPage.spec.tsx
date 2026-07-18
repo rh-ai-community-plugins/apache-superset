@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import InstanceManagementPage from '../InstanceManagementPage';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
@@ -152,13 +152,8 @@ describe('InstanceManagementPage', () => {
 
     await user.click(screen.getByRole('button', { name: /tear down/i }));
 
-    const confirmButtons = screen.getAllByRole('button', { name: /tear down/i });
-    const modalTeardown = confirmButtons.find(
-      (btn) => btn.closest('.pf-v6-c-modal-box') !== null,
-    );
-    if (modalTeardown) {
-      await user.click(modalTeardown);
-    }
+    const modal = screen.getByLabelText('Confirm teardown');
+    await user.click(within(modal).getByRole('button', { name: /tear down/i }));
 
     await waitFor(() => {
       expect(mockTeardown).toHaveBeenCalledWith('test-ns');
@@ -198,6 +193,23 @@ describe('InstanceManagementPage', () => {
     render(<InstanceManagementPage />);
     const retryBtn = screen.getByRole('button', { name: /retry/i });
     expect(retryBtn).toBeDisabled();
+  });
+
+  it('calls deploy when Retry is clicked from error state', async () => {
+    const user = userEvent.setup();
+    (useSupersetStatus as jest.Mock).mockReturnValue({
+      status: { phase: 'error', healthy: false, message: 'Init failed' },
+      loading: false,
+      error: null,
+      refresh: mockRefresh,
+    });
+    render(<InstanceManagementPage />);
+
+    await user.click(screen.getByRole('button', { name: /retry/i }));
+
+    await waitFor(() => {
+      expect(mockDeploy).toHaveBeenCalledWith('test-ns', expect.any(String));
+    });
   });
 
   it('shows deployError alert when a retry fails', () => {
