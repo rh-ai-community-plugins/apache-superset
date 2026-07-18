@@ -14,6 +14,20 @@ export const RELEASE_NAME = 'superset';
 export const SUPERSET_PORT = 8088;
 export const PART_OF_LABEL = 'app.kubernetes.io/part-of=superset';
 
+/**
+ * Label selector used for teardown resource listing.
+ *
+ * The Helm renderer sets two labels that together uniquely identify all
+ * resources belonging to this release:
+ *   - app.kubernetes.io/part-of=superset   (all plugin-managed resources)
+ *   - app.kubernetes.io/instance=<release>  (scoped to RELEASE_NAME)
+ *
+ * Using both labels avoids false matches if other workloads share the
+ * `part-of=superset` label, and aligns with the labels emitted by the
+ * helmRenderer's `superset.labels` and `superset.selectorLabels` helpers.
+ */
+export const TEARDOWN_LABEL_SELECTOR = `${PART_OF_LABEL},app.kubernetes.io/instance=${RELEASE_NAME}`;
+
 export function getFullname(): string {
   return `${RELEASE_NAME}-superset`;
 }

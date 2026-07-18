@@ -30,6 +30,7 @@ import supersetDeployRouter from '../../routes/supersetDeploy';
 import { k8sRequest } from '../../utils/k8sClient';
 import { applyResource, listResources, deleteResource } from '../../utils/k8sApply';
 import { renderHelmTemplates } from '../../utils/helmRenderer';
+import { TEARDOWN_LABEL_SELECTOR } from '../../utils/resourceNames';
 
 const mockK8sRequest = k8sRequest as jest.MockedFunction<typeof k8sRequest>;
 const mockApplyResource = applyResource as jest.MockedFunction<typeof applyResource>;
@@ -371,6 +372,15 @@ describe('DELETE /api/superset/deploy', () => {
       'Deployment',
       'test-ns',
       'superset-superset',
+    );
+    // Verify the teardown uses the combined label selector that matches Helm-rendered labels:
+    //   app.kubernetes.io/part-of=superset,app.kubernetes.io/instance=<releaseName>
+    expect(mockListResources).toHaveBeenCalledWith(
+      'test-token',
+      'apps/v1',
+      'Deployment',
+      'test-ns',
+      TEARDOWN_LABEL_SELECTOR,
     );
   });
 
