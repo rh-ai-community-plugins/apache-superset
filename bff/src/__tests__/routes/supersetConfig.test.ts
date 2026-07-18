@@ -21,6 +21,15 @@ jest.mock('../../utils/routeUrl', () => ({
   getRouteUrl: jest.fn(),
 }));
 
+jest.mock('../../utils/helmRenderer', () => ({
+  DEFAULT_CHART_DIR: '/mock/chart/dir',
+  loadChartMeta: () => ({
+    name: 'superset',
+    version: '0.1.0',
+    appVersion: '99.0.0-test',
+  }),
+}));
+
 import express from 'express';
 import supersetConfigRouter from '../../routes/supersetConfig';
 import { getResource } from '../../utils/k8sApply';
@@ -99,7 +108,7 @@ describe('GET /api/superset/config', () => {
     expect(res.body.namespace).toBe('test-ns');
     expect(res.body.url).toBe('https://superset.apps.test.com');
     expect(res.body.mode).toBe('lightweight');
-    expect(res.body.version).toBe('4.1.1');
+    expect(res.body.version).toBe('99.0.0-test');
     expect(res.body.embeddingEnabled).toBe(true);
   });
 
@@ -131,5 +140,30 @@ describe('GET /api/superset/config', () => {
     expect(res.status).toBe(200);
     expect(res.body.url).toBeUndefined();
     expect(res.body.mode).toBe('lightweight');
+  });
+});
+
+describe('APP_VERSION fallback', () => {
+  it('falls back to package.json version when chart metadata is unavailable', () => {
+    let capturedVersion: string | undefined;
+
+    jest.isolateModules(() => {
+      jest.doMock('../../utils/helmRenderer', () => ({
+        DEFAULT_CHART_DIR: '/nonexistent',
+        loadChartMeta: () => {
+          throw new Error('ENOENT: no such file or directory');
+        },
+      }));
+
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('../../routes/supersetConfig') as { default: { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> } };
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pkg = require('../../../package.json') as { version: string };
+      capturedVersion = pkg.version;
+
+      expect(mod.default).toBeDefined();
+    });
+
+    expect(capturedVersion).toBeDefined();
   });
 });

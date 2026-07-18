@@ -2,12 +2,24 @@ import { Router, Request, Response } from 'express';
 import { SupersetConfig, K8sResource } from '../types';
 import { getResource } from '../utils/k8sApply';
 import { K8sApiError } from '../utils/k8sClient';
+import { DEFAULT_CHART_DIR, loadChartMeta } from '../utils/helmRenderer';
 import { getSecretName, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
 
 const router = Router();
 
-const APP_VERSION = '4.1.1';
+function getAppVersion(): string {
+  try {
+    return loadChartMeta(DEFAULT_CHART_DIR).appVersion;
+  } catch {
+    // In container environments, chart/ may not be available — fall back to package.json
+    // (kept in sync by scripts/sync-chart-version.js).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    return (require('../../package.json') as { version: string }).version;
+  }
+}
+
+const APP_VERSION = getAppVersion();
 
 router.get('/', async (req: Request, res: Response) => {
   const token = req.token!;
