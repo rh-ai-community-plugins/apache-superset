@@ -136,8 +136,16 @@ Preconditions: A dashboard is embedded and rendering.
 
 Steps:
 
-1. Wait for the guest token to expire (default: 5 minutes) or invalidate it by restarting Superset.
+1. Wait for the guest token to expire (default: 300 seconds / 5 minutes) or invalidate it by restarting Superset.
 2. Observe the embedded dashboard behavior.
+
+> **Note:** The guest token TTL is configured via `GUEST_TOKEN_JWT_EXP_SECONDS` in
+> the Superset ConfigMap (`superset_config.py`). The Helm sub-chart sets this from
+> `embedding.guestTokenExpSeconds` in `chart/charts/superset/values.yaml`
+> (default: `300`). It can also be overridden at runtime via the
+> `SUPERSET_GUEST_TOKEN_JWT_EXP_SECONDS` environment variable on the Superset pod.
+> To shorten the wait during testing, set the value to a lower number (e.g., `30`)
+> before deploying.
 
 Expected: The embedded SDK requests a fresh token via `fetchGuestToken`. If the refresh succeeds, the dashboard continues rendering. If it fails, an error alert is displayed.
 
