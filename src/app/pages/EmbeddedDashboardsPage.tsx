@@ -37,6 +37,8 @@ import { useSupersetGuestToken } from '~/app/hooks/useSupersetGuestToken';
 import { useLastSelectedProject } from '~/app/hooks/useLastSelectedProject';
 import { SupersetDashboard } from '~/app/types';
 
+const SKELETON_CARD_COUNT = 3;
+
 const EmbeddedDashboardsPage: React.FC = () => {
   const [selectedProject, setSelectedProject] = useLastSelectedProject();
   const { status, loading: statusLoading } = useSupersetStatus(selectedProject);
@@ -274,7 +276,7 @@ const ListView: React.FC<ListViewProps> = ({
         <NotRunningState />
       ) : dashboardsLoading ? (
         <Gallery hasGutter minWidths={{ default: '250px' }} aria-label="Loading dashboards">
-          {[1, 2, 3].map((i) => (
+          {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => i).map((i) => (
             <Card key={i}>
               <CardBody>
                 <Skeleton fontSize="lg" width="70%" />
