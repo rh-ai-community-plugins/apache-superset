@@ -34,6 +34,17 @@ export class SupersetClient {
   private cachedAccessToken: CachedToken | null = null;
   private loginPromise: Promise<string> | null = null;
 
+  /**
+   * Creates a SupersetClient configured for unauthenticated health checks only.
+   *
+   * The Superset `/health` endpoint does not require credentials. Use this
+   * factory instead of passing empty-string credentials to make the intent
+   * explicit: only `getSupersetHealth()` will be called on the returned client.
+   */
+  static forHealthCheck(baseUrl: string, options: SupersetClientOptions = {}): SupersetClient {
+    return new SupersetClient(baseUrl, '', '', options);
+  }
+
   constructor(
     private readonly supersetUrl: string,
     private readonly adminUsername: string,

@@ -103,7 +103,7 @@ router.get('/', async (req: Request, res: Response) => {
     if (supersetDeployment.ready) {
       try {
         const serviceUrl = getSupersetServiceUrl(namespace);
-        const client = new SupersetClient(serviceUrl, '', '');
+        const client = SupersetClient.forHealthCheck(serviceUrl);
         const health = await client.getSupersetHealth();
         healthy = health.healthy;
         version = health.version;
