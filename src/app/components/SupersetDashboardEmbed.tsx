@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert } from '@patternfly/react-core';
 import { embedDashboard } from '@superset-ui/embedded-sdk';
 import './SupersetDashboardEmbed.css';
 
@@ -14,6 +15,7 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
   fetchGuestToken,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [embedError, setEmbedError] = useState<string | null>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -21,6 +23,8 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
 
     let cancelled = false;
     let unmountFn: (() => void) | undefined;
+
+    setEmbedError(null);
 
     embedDashboard({
       id: dashboardId,
@@ -32,13 +36,21 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
         hideChartControls: false,
         filters: { expanded: false },
       },
-    }).then((dashboard) => {
-      if (cancelled) {
-        dashboard.unmount();
-      } else {
-        unmountFn = dashboard.unmount;
-      }
-    });
+    })
+      .then((dashboard) => {
+        if (cancelled) {
+          dashboard.unmount();
+        } else {
+          unmountFn = dashboard.unmount;
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const message =
+            err instanceof Error ? err.message : 'Failed to load dashboard. Please try again.';
+          setEmbedError(message);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -48,10 +60,21 @@ export const SupersetDashboardEmbed: React.FC<SupersetDashboardEmbedProps> = ({
   }, [dashboardId, supersetDomain, fetchGuestToken]);
 
   return (
-    <div
-      ref={mountRef}
-      data-testid="superset-embed-container"
-      className="pf-v6-u-w-100 superset-embed-container"
-    />
+    <>
+      {embedError && (
+        <Alert
+          variant="danger"
+          title="Dashboard failed to load"
+          data-testid="superset-embed-error"
+        >
+          {embedError}
+        </Alert>
+      )}
+      <div
+        ref={mountRef}
+        data-testid="superset-embed-container"
+        className="pf-v6-u-w-100 superset-embed-container"
+      />
+    </>
   );
 };
