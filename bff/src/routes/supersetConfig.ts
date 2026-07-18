@@ -2,12 +2,13 @@ import { Router, Request, Response } from 'express';
 import { SupersetConfig, K8sResource } from '../types';
 import { getResource } from '../utils/k8sApply';
 import { K8sApiError } from '../utils/k8sClient';
+import { DEFAULT_CHART_DIR, loadChartMeta } from '../utils/helmRenderer';
 import { getSecretName, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
 
 const router = Router();
 
-const APP_VERSION = '4.1.1';
+const APP_VERSION = loadChartMeta(DEFAULT_CHART_DIR).appVersion;
 
 router.get('/', async (req: Request, res: Response) => {
   const token = req.token!;

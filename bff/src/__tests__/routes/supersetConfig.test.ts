@@ -21,6 +21,17 @@ jest.mock('../../utils/routeUrl', () => ({
   getRouteUrl: jest.fn(),
 }));
 
+// Use a sentinel version distinct from any real chart version so the test
+// proves the version is read from chart metadata rather than hardcoded.
+jest.mock('../../utils/helmRenderer', () => ({
+  DEFAULT_CHART_DIR: '/mock/chart/dir',
+  loadChartMeta: () => ({
+    name: 'superset',
+    version: '0.1.0',
+    appVersion: '99.0.0-test',
+  }),
+}));
+
 import express from 'express';
 import supersetConfigRouter from '../../routes/supersetConfig';
 import { getResource } from '../../utils/k8sApply';
@@ -99,7 +110,7 @@ describe('GET /api/superset/config', () => {
     expect(res.body.namespace).toBe('test-ns');
     expect(res.body.url).toBe('https://superset.apps.test.com');
     expect(res.body.mode).toBe('lightweight');
-    expect(res.body.version).toBe('4.1.1');
+    expect(res.body.version).toBe('99.0.0-test');
     expect(res.body.embeddingEnabled).toBe(true);
   });
 
