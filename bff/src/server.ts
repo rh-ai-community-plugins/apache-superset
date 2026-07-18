@@ -1,6 +1,7 @@
 import express from 'express';
 import { getK8sBaseUrl } from './utils/k8sClient';
 import { authMiddleware } from './middleware/auth';
+import { errorHandler } from './middleware/errorHandler';
 import supersetDeployRouter from './routes/supersetDeploy';
 import supersetStatusRouter from './routes/supersetStatus';
 import supersetConfigRouter from './routes/supersetConfig';
@@ -23,6 +24,10 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/superset/deploy', authMiddleware, supersetDeployRouter);
 app.use('/api/superset/status', authMiddleware, supersetStatusRouter);
 app.use('/api/superset/config', authMiddleware, supersetConfigRouter);
+
+// Global error handler — must be registered after all routes.
+// Sanitises K8sApiError so the raw K8s response body is never forwarded to clients.
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   try {

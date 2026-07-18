@@ -101,14 +101,20 @@ describe('k8sRequest', () => {
     mockReq.end = jest.fn();
     mockReq.write = jest.fn();
 
+    const rawBody = '{"message":"forbidden","reason":"Forbidden"}';
     mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
-      callback(createMockResponse(403, '{"message":"forbidden"}'));
+      callback(createMockResponse(403, rawBody));
       return mockReq;
     });
 
     const err = await k8sRequest('bad-token', '/api/v1/pods').catch((e) => e);
     expect(err).toBeInstanceOf(K8sApiError);
     expect((err as K8sApiError).statusCode).toBe(403);
+    // Raw body must be stored for programmatic server-side use
+    expect((err as K8sApiError).body).toBe(rawBody);
+    // But the message must NOT include the raw body (it would leak to clients)
+    expect((err as K8sApiError).message).not.toContain(rawBody);
+    expect((err as K8sApiError).message).toBe('K8s API returned 403');
   });
 
   it('rejects on request error', async () => {
