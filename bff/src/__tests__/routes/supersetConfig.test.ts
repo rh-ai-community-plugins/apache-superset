@@ -17,12 +17,18 @@ jest.mock('../../utils/k8sApply', () => ({
   getResource: jest.fn(),
 }));
 
+jest.mock('../../utils/routeUrl', () => ({
+  getRouteUrl: jest.fn(),
+}));
+
 import express from 'express';
 import supersetConfigRouter from '../../routes/supersetConfig';
 import { getResource } from '../../utils/k8sApply';
 import { K8sApiError } from '../../utils/k8sClient';
+import { getRouteUrl } from '../../utils/routeUrl';
 
 const mockGetResource = getResource as jest.MockedFunction<typeof getResource>;
+const mockGetRouteUrl = getRouteUrl as jest.MockedFunction<typeof getRouteUrl>;
 
 function createApp() {
   const app = express();
@@ -63,6 +69,7 @@ async function request(app: express.Express, path: string) {
 describe('GET /api/superset/config', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetRouteUrl.mockResolvedValue(undefined);
   });
 
   it('returns 400 when namespace is missing', async () => {
@@ -74,29 +81,15 @@ describe('GET /api/superset/config', () => {
   });
 
   it('returns config with route URL when available', async () => {
-    mockGetResource.mockImplementation(async (_token, _av, kind) => {
-      if (kind === 'Route') {
-        return {
-          apiVersion: 'route.openshift.io/v1',
-          kind: 'Route',
-          metadata: { name: 'superset-superset' },
-          spec: {
-            host: 'superset.apps.test.com',
-            tls: { termination: 'edge' },
-          },
-        };
-      }
-      if (kind === 'Secret') {
-        return {
-          apiVersion: 'v1',
-          kind: 'Secret',
-          metadata: { name: 'superset-superset-secret' },
-          data: {
-            SUPERSET_GUEST_TOKEN_JWT_SECRET: 'c2VjcmV0',
-          },
-        };
-      }
-      throw new Error(`Unexpected kind: ${kind}`);
+    mockGetRouteUrl.mockResolvedValue('https://superset.apps.test.com');
+
+    mockGetResource.mockResolvedValueOnce({
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { name: 'superset-superset-secret' },
+      data: {
+        SUPERSET_GUEST_TOKEN_JWT_SECRET: 'c2VjcmV0',
+      },
     });
 
     const app = createApp();
@@ -111,15 +104,9 @@ describe('GET /api/superset/config', () => {
   });
 
   it('returns 404 when secret is not found', async () => {
-    mockGetResource.mockImplementation(async (_token, _apiVersion, kind) => {
-      if (kind === 'Route') {
-        throw new K8sApiError('Not found', 404, '');
-      }
-      if (kind === 'Secret') {
-        throw new K8sApiError('Not found', 404, '');
-      }
-      throw new Error(`Unexpected kind: ${kind}`);
-    });
+    mockGetResource.mockRejectedValueOnce(
+      new K8sApiError('Not found', 404, ''),
+    );
 
     const app = createApp();
     const res = await request(app, '/api/superset/config?namespace=test-ns');
@@ -129,21 +116,13 @@ describe('GET /api/superset/config', () => {
   });
 
   it('returns config without URL when route is not found', async () => {
-    mockGetResource.mockImplementation(async (_token, _apiVersion, kind) => {
-      if (kind === 'Route') {
-        throw new K8sApiError('Not found', 404, '');
-      }
-      if (kind === 'Secret') {
-        return {
-          apiVersion: 'v1',
-          kind: 'Secret',
-          metadata: { name: 'superset-superset-secret' },
-          data: {
-            SUPERSET_GUEST_TOKEN_JWT_SECRET: 'c2VjcmV0',
-          },
-        };
-      }
-      throw new Error(`Unexpected kind: ${kind}`);
+    mockGetResource.mockResolvedValueOnce({
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { name: 'superset-superset-secret' },
+      data: {
+        SUPERSET_GUEST_TOKEN_JWT_SECRET: 'c2VjcmV0',
+      },
     });
 
     const app = createApp();

@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { SupersetStatus, K8sResource } from '../types';
+import { SupersetStatus } from '../types';
 import { getResource } from '../utils/k8sApply';
 import { K8sApiError } from '../utils/k8sClient';
 import { SupersetClient } from '../utils/supersetClient';
+import { getDeploymentName, getPostgresDeploymentName, getSupersetServiceUrl } from '../utils/resourceNames';
+import { getRouteUrl } from '../utils/routeUrl';
 
 const router = Router();
-
-const RELEASE_NAME = 'superset';
-const SUPERSET_PORT = 8088;
 
 interface DeploymentStatus {
   spec?: {
@@ -26,20 +25,7 @@ interface DeploymentStatus {
   [key: string]: unknown;
 }
 
-function getDeploymentName(): string {
-  return `${RELEASE_NAME}-superset`;
-}
-
-function getPostgresDeploymentName(): string {
-  return `${RELEASE_NAME}-superset-postgres`;
-}
-
-function getSupersetServiceUrl(namespace: string): string {
-  const serviceName = `${RELEASE_NAME}-superset-svc`;
-  return `http://${serviceName}.${namespace}.svc.cluster.local:${SUPERSET_PORT}`;
-}
-
-async function getDeploymentStatus(
+async function checkDeploymentStatus(
   token: string,
   namespace: string,
   name: string,
@@ -79,30 +65,6 @@ async function getDeploymentStatus(
   }
 }
 
-async function getRouteUrl(token: string, namespace: string): Promise<string | undefined> {
-  try {
-    const routeName = `${RELEASE_NAME}-superset`;
-    const route = await getResource<K8sResource>(
-      token,
-      'route.openshift.io/v1',
-      'Route',
-      namespace,
-      routeName,
-    );
-
-    const spec = route.spec as Record<string, unknown> | undefined;
-    const host = spec?.host as string | undefined;
-    if (host) {
-      const tls = spec?.tls as Record<string, unknown> | undefined;
-      const scheme = tls ? 'https' : 'http';
-      return `${scheme}://${host}`;
-    }
-  } catch {
-    // Route not found or not available (non-OpenShift cluster)
-  }
-  return undefined;
-}
-
 router.get('/', async (req: Request, res: Response) => {
   const token = req.token!;
   const namespace = req.query.namespace;
@@ -113,12 +75,9 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const deploymentName = getDeploymentName();
-    const postgresName = getPostgresDeploymentName();
-
     const [supersetDeployment, postgresDeployment] = await Promise.all([
-      getDeploymentStatus(token, namespace, deploymentName),
-      getDeploymentStatus(token, namespace, postgresName),
+      checkDeploymentStatus(token, namespace, getDeploymentName()),
+      checkDeploymentStatus(token, namespace, getPostgresDeploymentName()),
     ]);
 
     if (
@@ -160,11 +119,6 @@ router.get('/', async (req: Request, res: Response) => {
     let phase: SupersetStatus['phase'];
     if (allReady && healthy) {
       phase = 'running';
-    } else if (
-      supersetDeployment.message === 'Deployment not found' &&
-      postgresDeployment.message === 'Deployment not found'
-    ) {
-      phase = 'not-deployed';
     } else if (allReady && !healthy) {
       phase = 'error';
     } else {

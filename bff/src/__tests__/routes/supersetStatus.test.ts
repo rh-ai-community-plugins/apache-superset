@@ -15,7 +15,10 @@ jest.mock('../../utils/k8sClient', () => ({
 
 jest.mock('../../utils/k8sApply', () => ({
   getResource: jest.fn(),
-  listResources: jest.fn(),
+}));
+
+jest.mock('../../utils/routeUrl', () => ({
+  getRouteUrl: jest.fn(),
 }));
 
 jest.mock('../../utils/supersetClient', () => ({
@@ -28,9 +31,11 @@ import express from 'express';
 import supersetStatusRouter from '../../routes/supersetStatus';
 import { getResource } from '../../utils/k8sApply';
 import { K8sApiError } from '../../utils/k8sClient';
+import { getRouteUrl } from '../../utils/routeUrl';
 import { SupersetClient } from '../../utils/supersetClient';
 
 const mockGetResource = getResource as jest.MockedFunction<typeof getResource>;
+const mockGetRouteUrl = getRouteUrl as jest.MockedFunction<typeof getRouteUrl>;
 
 function createApp() {
   const app = express();
@@ -71,6 +76,7 @@ async function request(app: express.Express, path: string) {
 describe('GET /api/superset/status', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetRouteUrl.mockResolvedValue(undefined);
   });
 
   it('returns 400 when namespace is missing', async () => {
@@ -95,7 +101,7 @@ describe('GET /api/superset/status', () => {
   });
 
   it('returns deploying when pods are not yet ready', async () => {
-    mockGetResource.mockImplementation(async (_token, _apiVersion, _kind, _namespace, name) => {
+    mockGetResource.mockImplementation(async (_token, _av, _kind, _namespace, name) => {
       return {
         apiVersion: 'apps/v1',
         kind: 'Deployment',
@@ -120,18 +126,7 @@ describe('GET /api/superset/status', () => {
   });
 
   it('returns running when all pods are ready and health check passes', async () => {
-    mockGetResource.mockImplementation(async (_token, _av, kind, _namespace, name) => {
-      if (kind === 'Route') {
-        return {
-          apiVersion: 'route.openshift.io/v1',
-          kind: 'Route',
-          metadata: { name: name as string },
-          spec: {
-            host: 'superset.apps.test.com',
-            tls: { termination: 'edge' },
-          },
-        };
-      }
+    mockGetResource.mockImplementation(async (_token, _av, _kind, _namespace, name) => {
       return {
         apiVersion: 'apps/v1',
         kind: 'Deployment',
@@ -147,6 +142,8 @@ describe('GET /api/superset/status', () => {
       };
     });
 
+    mockGetRouteUrl.mockResolvedValue('https://superset.apps.test.com');
+
     const app = createApp();
     const res = await request(app, '/api/superset/status?namespace=test-ns');
 
@@ -157,10 +154,7 @@ describe('GET /api/superset/status', () => {
   });
 
   it('returns error when pods are ready but health check fails', async () => {
-    mockGetResource.mockImplementation(async (_token, _av, kind, _namespace, name) => {
-      if (kind === 'Route') {
-        throw new K8sApiError('Not found', 404, '');
-      }
+    mockGetResource.mockImplementation(async (_token, _av, _kind, _namespace, name) => {
       return {
         apiVersion: 'apps/v1',
         kind: 'Deployment',

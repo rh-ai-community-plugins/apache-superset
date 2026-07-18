@@ -8,7 +8,7 @@ import supersetConfigRouter from './routes/supersetConfig';
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-app.use(express.json());
+app.use(express.json({ limit: '10kb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -4,14 +4,30 @@ import { SupersetDeployRequest, K8sResource } from '../types';
 import { renderHelmTemplates } from '../utils/helmRenderer';
 import { applyResource, listResources, deleteResource } from '../utils/k8sApply';
 import { k8sRequest, K8sApiError } from '../utils/k8sClient';
+import { RELEASE_NAME, PART_OF_LABEL } from '../utils/resourceNames';
 
 const router = Router();
 
-const RELEASE_NAME = 'superset';
-const MANAGED_BY_LABEL = 'app.kubernetes.io/part-of=superset';
+const NAMESPACE_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const ORIGIN_REGEX = /^https?:\/\/[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])*(:\d+)?$/;
 
 function generateSecret(length: number): string {
   return crypto.randomBytes(length).toString('base64url').slice(0, length);
+}
+
+function generateAlphanumericPassword(length: number): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const maxValid = Math.floor(256 / chars.length) * chars.length;
+  let result = '';
+  while (result.length < length) {
+    const bytes = crypto.randomBytes(length - result.length);
+    for (let i = 0; i < bytes.length && result.length < length; i++) {
+      if (bytes[i] < maxValid) {
+        result += chars[bytes[i] % chars.length];
+      }
+    }
+  }
+  return result;
 }
 
 interface SelfSubjectAccessReview {
@@ -21,14 +37,14 @@ interface SelfSubjectAccessReview {
   };
 }
 
-async function checkRbac(token: string, namespace: string): Promise<boolean> {
+async function checkRbac(token: string, namespace: string, verb: string): Promise<boolean> {
   const review: Record<string, unknown> = {
     apiVersion: 'authorization.k8s.io/v1',
     kind: 'SelfSubjectAccessReview',
     spec: {
       resourceAttributes: {
         namespace,
-        verb: 'create',
+        verb,
         group: 'apps',
         resource: 'deployments',
       },
@@ -47,6 +63,16 @@ async function checkRbac(token: string, namespace: string): Promise<boolean> {
   }
 }
 
+function validateNamespace(ns: unknown): string | null {
+  if (typeof ns !== 'string' || !ns.trim()) {
+    return 'namespace is required';
+  }
+  if (!NAMESPACE_REGEX.test(ns)) {
+    return 'namespace must be a valid Kubernetes namespace (lowercase alphanumeric and hyphens, max 63 chars)';
+  }
+  return null;
+}
+
 function validateDeployRequest(body: unknown): { valid: true; data: SupersetDeployRequest } | { valid: false; error: string } {
   if (!body || typeof body !== 'object') {
     return { valid: false, error: 'Request body is required' };
@@ -54,18 +80,23 @@ function validateDeployRequest(body: unknown): { valid: true; data: SupersetDepl
 
   const { namespace, dashboardOrigin } = body as Record<string, unknown>;
 
-  if (typeof namespace !== 'string' || !namespace.trim()) {
-    return { valid: false, error: 'namespace is required' };
+  const nsError = validateNamespace(namespace);
+  if (nsError) {
+    return { valid: false, error: nsError };
   }
 
   if (typeof dashboardOrigin !== 'string' || !dashboardOrigin.trim()) {
     return { valid: false, error: 'dashboardOrigin is required' };
   }
 
+  if (!ORIGIN_REGEX.test(dashboardOrigin.trim())) {
+    return { valid: false, error: 'dashboardOrigin must be a valid HTTP(S) origin (e.g., https://dashboard.example.com)' };
+  }
+
   return {
     valid: true,
     data: {
-      namespace: namespace.trim(),
+      namespace: (namespace as string).trim(),
       dashboardOrigin: dashboardOrigin.trim(),
       adminPassword: typeof (body as Record<string, unknown>).adminPassword === 'string'
         ? ((body as Record<string, unknown>).adminPassword as string)
@@ -92,7 +123,7 @@ router.post('/', async (req: Request, res: Response) => {
   const { namespace, dashboardOrigin, adminPassword, secretKey, postgresPassword } = validation.data;
 
   try {
-    const allowed = await checkRbac(token, namespace);
+    const allowed = await checkRbac(token, namespace, 'create');
     if (!allowed) {
       res.status(403).json({ error: 'Insufficient permissions to deploy in this namespace' });
       return;
@@ -159,12 +190,21 @@ router.delete('/', async (req: Request, res: Response) => {
   const token = req.token!;
   const namespace = req.query.namespace;
 
-  if (typeof namespace !== 'string' || !namespace.trim()) {
-    res.status(400).json({ error: 'namespace query parameter is required' });
+  const nsError = validateNamespace(namespace);
+  if (nsError) {
+    res.status(400).json({ error: nsError });
     return;
   }
 
+  const ns = (namespace as string).trim();
+
   try {
+    const allowed = await checkRbac(token, ns, 'delete');
+    if (!allowed) {
+      res.status(403).json({ error: 'Insufficient permissions to tear down resources in this namespace' });
+      return;
+    }
+
     const kindsToDelete: Array<{ apiVersion: string; kind: string }> = [
       { apiVersion: 'apps/v1', kind: 'Deployment' },
       { apiVersion: 'v1', kind: 'Service' },
@@ -184,13 +224,13 @@ router.delete('/', async (req: Request, res: Response) => {
           token,
           apiVersion,
           kind,
-          namespace,
-          MANAGED_BY_LABEL,
+          ns,
+          PART_OF_LABEL,
         );
 
         for (const resource of list.items) {
           try {
-            await deleteResource(token, apiVersion, kind, namespace, resource.metadata.name);
+            await deleteResource(token, apiVersion, kind, ns, resource.metadata.name);
             deleted.push({ kind, name: resource.metadata.name });
           } catch (err) {
             if (err instanceof K8sApiError && err.statusCode === 404) {
@@ -211,25 +251,15 @@ router.delete('/', async (req: Request, res: Response) => {
 
     res.json({
       message: deleted.length > 0 ? 'Teardown initiated' : 'No resources found',
-      namespace,
+      namespace: ns,
       deleted,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`Teardown error in namespace ${namespace}:`, message);
+    console.error(`Teardown error in namespace ${ns}:`, message);
     res.status(500).json({ error: 'Internal server error during teardown' });
   }
 });
-
-function generateAlphanumericPassword(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = crypto.randomBytes(length);
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars[bytes[i] % chars.length];
-  }
-  return result;
-}
 
 export default router;

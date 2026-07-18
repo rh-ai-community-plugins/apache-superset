@@ -102,6 +102,17 @@ describe('POST /api/superset/deploy', () => {
     expect((res.body as Record<string, unknown>).error).toBe('namespace is required');
   });
 
+  it('returns 400 for invalid namespace format', async () => {
+    const app = createApp();
+    const res = await request(app, 'POST', '/api/superset/deploy', {
+      namespace: 'INVALID_NS!',
+      dashboardOrigin: 'https://dashboard.test',
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as Record<string, unknown>).error).toContain('valid Kubernetes namespace');
+  });
+
   it('returns 400 when dashboardOrigin is missing', async () => {
     const app = createApp();
     const res = await request(app, 'POST', '/api/superset/deploy', {
@@ -110,6 +121,17 @@ describe('POST /api/superset/deploy', () => {
 
     expect(res.status).toBe(400);
     expect((res.body as Record<string, unknown>).error).toBe('dashboardOrigin is required');
+  });
+
+  it('returns 400 for invalid dashboardOrigin format', async () => {
+    const app = createApp();
+    const res = await request(app, 'POST', '/api/superset/deploy', {
+      namespace: 'test-ns',
+      dashboardOrigin: 'not-a-url',
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as Record<string, unknown>).error).toContain('valid HTTP(S) origin');
   });
 
   it('returns 403 when RBAC check fails', async () => {
@@ -258,7 +280,31 @@ describe('DELETE /api/superset/deploy', () => {
     expect((res.body as Record<string, unknown>).error).toContain('namespace');
   });
 
+  it('returns 400 for invalid namespace format', async () => {
+    const app = createApp();
+    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=INVALID!');
+
+    expect(res.status).toBe(400);
+    expect((res.body as Record<string, unknown>).error).toContain('valid Kubernetes namespace');
+  });
+
+  it('returns 403 when RBAC check fails', async () => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: false },
+    });
+
+    const app = createApp();
+    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=test-ns');
+
+    expect(res.status).toBe(403);
+    expect((res.body as Record<string, unknown>).error).toContain('Insufficient permissions');
+  });
+
   it('deletes resources by label', async () => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: true },
+    });
+
     mockListResources
       .mockResolvedValueOnce({
         apiVersion: 'apps/v1',
@@ -293,6 +339,10 @@ describe('DELETE /api/superset/deploy', () => {
   });
 
   it('returns success with empty deleted when no resources found', async () => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: true },
+    });
+
     mockListResources.mockResolvedValue({
       apiVersion: 'v1',
       kind: 'List',

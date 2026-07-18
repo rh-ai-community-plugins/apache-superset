@@ -2,15 +2,12 @@ import { Router, Request, Response } from 'express';
 import { SupersetConfig, K8sResource } from '../types';
 import { getResource } from '../utils/k8sApply';
 import { K8sApiError } from '../utils/k8sClient';
+import { getSecretName } from '../utils/resourceNames';
+import { getRouteUrl } from '../utils/routeUrl';
 
 const router = Router();
 
-const RELEASE_NAME = 'superset';
 const APP_VERSION = '4.1.1';
-
-function getSecretName(): string {
-  return `${RELEASE_NAME}-superset-secret`;
-}
 
 router.get('/', async (req: Request, res: Response) => {
   const token = req.token!;
@@ -22,28 +19,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   try {
-    let url: string | undefined;
-
-    try {
-      const routeName = `${RELEASE_NAME}-superset`;
-      const route = await getResource<K8sResource>(
-        token,
-        'route.openshift.io/v1',
-        'Route',
-        namespace,
-        routeName,
-      );
-      const spec = route.spec as Record<string, unknown> | undefined;
-      const host = spec?.host as string | undefined;
-      if (host) {
-        const tls = spec?.tls as Record<string, unknown> | undefined;
-        url = tls ? `https://${host}` : `http://${host}`;
-      }
-    } catch (err) {
-      if (!(err instanceof K8sApiError && err.statusCode === 404)) {
-        throw err;
-      }
-    }
+    const url = await getRouteUrl(token, namespace);
 
     let embeddingEnabled = true;
 
