@@ -100,6 +100,37 @@ describe('GET /api/superset/status', () => {
     expect(res.body.healthy).toBe(false);
   });
 
+  it('returns deploying (not not-deployed) when only one deployment is missing', async () => {
+    // Superset deployment found but postgres returns 404 — only one is missing,
+    // so this should NOT be treated as not-deployed (requires both found=false).
+    mockGetResource.mockImplementation(async (_token, _av, _kind, _namespace, name) => {
+      const deploymentName = name as string;
+      if (deploymentName.includes('postgres')) {
+        throw new K8sApiError('Not found', 404, '');
+      }
+      return {
+        apiVersion: 'apps/v1',
+        kind: 'Deployment',
+        metadata: { name: deploymentName },
+        spec: { replicas: 1 },
+        status: {
+          readyReplicas: 0,
+          replicas: 1,
+          conditions: [
+            { type: 'Progressing', status: 'True', message: 'Waiting for rollout' },
+          ],
+        },
+      };
+    });
+
+    const app = createApp();
+    const res = await request(app, '/api/superset/status?namespace=test-ns');
+
+    expect(res.status).toBe(200);
+    expect(res.body.phase).toBe('deploying');
+    expect(res.body.phase).not.toBe('not-deployed');
+  });
+
   it('returns deploying when pods are not yet ready', async () => {
     mockGetResource.mockImplementation(async (_token, _av, _kind, _namespace, name) => {
       return {
