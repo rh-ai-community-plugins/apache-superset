@@ -1,19 +1,13 @@
 import { K8sResource } from '../../types';
 
-jest.mock('../../utils/k8sClient', () => ({
-  k8sRequest: jest.fn(),
-  K8sApiError: class K8sApiError extends Error {
-    constructor(
-      message: string,
-      public readonly statusCode: number,
-      public readonly body: string,
-    ) {
-      super(message);
-      this.name = 'K8sApiError';
-    }
-  },
-  getK8sBaseUrl: () => 'https://k8s.test',
-}));
+jest.mock('../../utils/k8sClient', () => {
+  const actual = jest.requireActual<typeof import('../../utils/k8sClient')>('../../utils/k8sClient');
+  return {
+    k8sRequest: jest.fn(),
+    K8sApiError: actual.K8sApiError,
+    getK8sBaseUrl: () => 'https://k8s.test',
+  };
+});
 
 jest.mock('../../utils/k8sApply', () => ({
   applyResource: jest.fn(),
@@ -25,12 +19,12 @@ jest.mock('../../utils/helmRenderer', () => ({
   renderHelmTemplates: jest.fn(),
 }));
 
-import express from 'express';
 import supersetDeployRouter from '../../routes/supersetDeploy';
 import { k8sRequest } from '../../utils/k8sClient';
 import { applyResource, listResources, deleteResource } from '../../utils/k8sApply';
 import { renderHelmTemplates } from '../../utils/helmRenderer';
 import { TEARDOWN_LABEL_SELECTOR } from '../../utils/resourceNames';
+import { createTestApp, createTestAppNoToken, testRequest } from '../helpers/testServer';
 
 const mockK8sRequest = k8sRequest as jest.MockedFunction<typeof k8sRequest>;
 const mockApplyResource = applyResource as jest.MockedFunction<typeof applyResource>;
@@ -38,63 +32,7 @@ const mockListResources = listResources as jest.MockedFunction<typeof listResour
 const mockDeleteResource = deleteResource as jest.MockedFunction<typeof deleteResource>;
 const mockRenderHelmTemplates = renderHelmTemplates as jest.MockedFunction<typeof renderHelmTemplates>;
 
-function createApp() {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.token = 'test-token';
-    next();
-  });
-  app.use('/api/superset/deploy', supersetDeployRouter);
-  return app;
-}
-
-function createAppNoToken() {
-  const app = express();
-  app.use(express.json());
-  // Intentionally omit auth middleware — req.token remains undefined
-  app.use('/api/superset/deploy', supersetDeployRouter);
-  return app;
-}
-
-async function request(app: express.Express, method: string, path: string, body?: unknown) {
-  const http = await import('http');
-  return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
-    const server = app.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === 'string') {
-        server.close();
-        reject(new Error('Failed to get server address'));
-        return;
-      }
-      const options = {
-        hostname: '127.0.0.1',
-        port: addr.port,
-        path,
-        method: method.toUpperCase(),
-        headers: body ? { 'Content-Type': 'application/json' } : {},
-      };
-      const req = http.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          server.close();
-          try {
-            resolve({ status: res.statusCode!, body: data ? JSON.parse(data) : null });
-          } catch {
-            resolve({ status: res.statusCode!, body: data });
-          }
-        });
-      });
-      req.on('error', (err) => {
-        server.close();
-        reject(err);
-      });
-      if (body) req.write(JSON.stringify(body));
-      req.end();
-    });
-  });
-}
+const MOUNT_PATH = '/api/superset/deploy';
 
 describe('POST /api/superset/deploy', () => {
   beforeEach(() => {
@@ -102,10 +40,10 @@ describe('POST /api/superset/deploy', () => {
   });
 
   it('returns 401 when token is missing', async () => {
-    const app = createAppNoToken();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin: 'https://dashboard.test',
+    const app = createTestAppNoToken(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin: 'https://dashboard.test' },
     });
 
     expect(res.status).toBe(401);
@@ -113,9 +51,10 @@ describe('POST /api/superset/deploy', () => {
   });
 
   it('returns 400 when namespace is missing', async () => {
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      dashboardOrigin: 'https://dashboard.test',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { dashboardOrigin: 'https://dashboard.test' },
     });
 
     expect(res.status).toBe(400);
@@ -123,10 +62,10 @@ describe('POST /api/superset/deploy', () => {
   });
 
   it('returns 400 for invalid namespace format', async () => {
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'INVALID_NS!',
-      dashboardOrigin: 'https://dashboard.test',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'INVALID_NS!', dashboardOrigin: 'https://dashboard.test' },
     });
 
     expect(res.status).toBe(400);
@@ -134,9 +73,10 @@ describe('POST /api/superset/deploy', () => {
   });
 
   it('returns 400 when dashboardOrigin is missing', async () => {
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns' },
     });
 
     expect(res.status).toBe(400);
@@ -144,10 +84,10 @@ describe('POST /api/superset/deploy', () => {
   });
 
   it('returns 400 for invalid dashboardOrigin format', async () => {
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin: 'not-a-url',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin: 'not-a-url' },
     });
 
     expect(res.status).toBe(400);
@@ -159,10 +99,10 @@ describe('POST /api/superset/deploy', () => {
     ['port 65536', 'https://dashboard.example.com:65536'],
     ['port 99999', 'https://dashboard.example.com:99999'],
   ])('returns 400 for dashboardOrigin with invalid %s', async (_label, dashboardOrigin) => {
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin,
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin },
     });
 
     expect(res.status).toBe(400);
@@ -180,10 +120,10 @@ describe('POST /api/superset/deploy', () => {
     });
     mockRenderHelmTemplates.mockReturnValueOnce({ resources: [], warnings: [] });
 
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin,
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin },
     });
 
     // Should not be a 400 validation error — passes origin check
@@ -195,10 +135,10 @@ describe('POST /api/superset/deploy', () => {
       status: { allowed: false },
     });
 
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin: 'https://dashboard.test',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin: 'https://dashboard.test' },
     });
 
     expect(res.status).toBe(403);
@@ -232,10 +172,10 @@ describe('POST /api/superset/deploy', () => {
       .mockResolvedValueOnce(mockResources[0])
       .mockResolvedValueOnce(mockResources[1]);
 
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin: 'https://dashboard.test',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin: 'https://dashboard.test' },
     });
 
     expect(res.status).toBe(201);
@@ -279,10 +219,10 @@ describe('POST /api/superset/deploy', () => {
       .mockResolvedValueOnce(mockResources[0])
       .mockRejectedValueOnce(new Error('Failed to apply'));
 
-    const app = createApp();
-    const res = await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin: 'https://dashboard.test',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: { namespace: 'test-ns', dashboardOrigin: 'https://dashboard.test' },
     });
 
     expect(res.status).toBe(207);
@@ -302,13 +242,16 @@ describe('POST /api/superset/deploy', () => {
       warnings: [],
     });
 
-    const app = createApp();
-    await request(app, 'POST', '/api/superset/deploy', {
-      namespace: 'test-ns',
-      dashboardOrigin: 'https://dashboard.test',
-      adminPassword: 'custom-admin-pw',
-      secretKey: 'custom-secret-key',
-      postgresPassword: 'customPGpw123',
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    await testRequest(app, '/api/superset/deploy', {
+      method: 'POST',
+      body: {
+        namespace: 'test-ns',
+        dashboardOrigin: 'https://dashboard.test',
+        adminPassword: 'custom-admin-pw',
+        secretKey: 'custom-secret-key',
+        postgresPassword: 'customPGpw123',
+      },
     });
 
     expect(mockRenderHelmTemplates).toHaveBeenCalledWith(
@@ -329,24 +272,28 @@ describe('DELETE /api/superset/deploy', () => {
   });
 
   it('returns 401 when token is missing', async () => {
-    const app = createAppNoToken();
-    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=test-ns');
+    const app = createTestAppNoToken(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns', {
+      method: 'DELETE',
+    });
 
     expect(res.status).toBe(401);
     expect((res.body as Record<string, unknown>).error).toBe('Authentication required');
   });
 
   it('returns 400 when namespace is missing', async () => {
-    const app = createApp();
-    const res = await request(app, 'DELETE', '/api/superset/deploy');
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy', { method: 'DELETE' });
 
     expect(res.status).toBe(400);
     expect((res.body as Record<string, unknown>).error).toContain('namespace');
   });
 
   it('returns 400 for invalid namespace format', async () => {
-    const app = createApp();
-    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=INVALID!');
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=INVALID!', {
+      method: 'DELETE',
+    });
 
     expect(res.status).toBe(400);
     expect((res.body as Record<string, unknown>).error).toContain('valid Kubernetes namespace');
@@ -357,8 +304,10 @@ describe('DELETE /api/superset/deploy', () => {
       status: { allowed: false },
     });
 
-    const app = createApp();
-    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=test-ns');
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns', {
+      method: 'DELETE',
+    });
 
     expect(res.status).toBe(403);
     expect((res.body as Record<string, unknown>).error).toContain('Insufficient permissions');
@@ -386,8 +335,10 @@ describe('DELETE /api/superset/deploy', () => {
 
     mockDeleteResource.mockResolvedValueOnce(undefined);
 
-    const app = createApp();
-    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=test-ns');
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns', {
+      method: 'DELETE',
+    });
 
     expect(res.status).toBe(200);
     const body = res.body as Record<string, unknown>;
@@ -422,8 +373,10 @@ describe('DELETE /api/superset/deploy', () => {
       items: [],
     });
 
-    const app = createApp();
-    const res = await request(app, 'DELETE', '/api/superset/deploy?namespace=test-ns');
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns', {
+      method: 'DELETE',
+    });
 
     expect(res.status).toBe(200);
     const body = res.body as Record<string, unknown>;

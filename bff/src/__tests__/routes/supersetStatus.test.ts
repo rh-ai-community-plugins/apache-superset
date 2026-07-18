@@ -1,17 +1,11 @@
-jest.mock('../../utils/k8sClient', () => ({
-  k8sRequest: jest.fn(),
-  K8sApiError: class K8sApiError extends Error {
-    constructor(
-      message: string,
-      public readonly statusCode: number,
-      public readonly body: string,
-    ) {
-      super(message);
-      this.name = 'K8sApiError';
-    }
-  },
-  getK8sBaseUrl: () => 'https://k8s.test',
-}));
+jest.mock('../../utils/k8sClient', () => {
+  const actual = jest.requireActual<typeof import('../../utils/k8sClient')>('../../utils/k8sClient');
+  return {
+    k8sRequest: jest.fn(),
+    K8sApiError: actual.K8sApiError,
+    getK8sBaseUrl: () => 'https://k8s.test',
+  };
+});
 
 jest.mock('../../utils/k8sApply', () => ({
   getResource: jest.fn(),
@@ -34,58 +28,17 @@ jest.mock('../../utils/supersetClient', () => {
   return { SupersetClient: MockSupersetClient };
 });
 
-import express from 'express';
 import supersetStatusRouter from '../../routes/supersetStatus';
 import { getResource } from '../../utils/k8sApply';
 import { K8sApiError } from '../../utils/k8sClient';
 import { getRouteUrl } from '../../utils/routeUrl';
 import { SupersetClient } from '../../utils/supersetClient';
+import { createTestApp, createTestAppNoToken, testRequest } from '../helpers/testServer';
 
 const mockGetResource = getResource as jest.MockedFunction<typeof getResource>;
 const mockGetRouteUrl = getRouteUrl as jest.MockedFunction<typeof getRouteUrl>;
 
-function createApp() {
-  const app = express();
-  app.use((req, _res, next) => {
-    req.token = 'test-token';
-    next();
-  });
-  app.use('/api/superset/status', supersetStatusRouter);
-  return app;
-}
-
-function createAppNoToken() {
-  const app = express();
-  // Intentionally omit auth middleware — req.token remains undefined
-  app.use('/api/superset/status', supersetStatusRouter);
-  return app;
-}
-
-async function request(app: express.Express, path: string) {
-  const http = await import('http');
-  return new Promise<{ status: number; body: Record<string, unknown> }>((resolve, reject) => {
-    const server = app.listen(0, () => {
-      const addr = server.address();
-      if (!addr || typeof addr === 'string') {
-        server.close();
-        reject(new Error('Failed to get server address'));
-        return;
-      }
-      const req = http.get(`http://127.0.0.1:${addr.port}${path}`, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          server.close();
-          resolve({ status: res.statusCode!, body: JSON.parse(data) });
-        });
-      });
-      req.on('error', (err) => {
-        server.close();
-        reject(err);
-      });
-    });
-  });
-}
+const MOUNT_PATH = '/api/superset/status';
 
 describe('GET /api/superset/status', () => {
   beforeEach(() => {
@@ -94,19 +47,21 @@ describe('GET /api/superset/status', () => {
   });
 
   it('returns 401 when token is missing', async () => {
-    const app = createAppNoToken();
-    const res = await request(app, '/api/superset/status?namespace=test-ns');
+    const app = createTestAppNoToken(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(401);
-    expect(res.body.error).toBe('Authentication required');
+    expect(body.error).toBe('Authentication required');
   });
 
   it('returns 400 when namespace is missing', async () => {
-    const app = createApp();
-    const res = await request(app, '/api/superset/status');
+    const app = createTestApp(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('namespace');
+    expect(body.error).toContain('namespace');
   });
 
   it('returns not-deployed when deployments are not found', async () => {
@@ -114,12 +69,13 @@ describe('GET /api/superset/status', () => {
       new K8sApiError('Not found', 404, ''),
     );
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/status?namespace=test-ns');
+    const app = createTestApp(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.phase).toBe('not-deployed');
-    expect(res.body.healthy).toBe(false);
+    expect(body.phase).toBe('not-deployed');
+    expect(body.healthy).toBe(false);
   });
 
   it('returns deploying (not not-deployed) when only one deployment is missing', async () => {
@@ -145,12 +101,13 @@ describe('GET /api/superset/status', () => {
       };
     });
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/status?namespace=test-ns');
+    const app = createTestApp(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.phase).toBe('deploying');
-    expect(res.body.phase).not.toBe('not-deployed');
+    expect(body.phase).toBe('deploying');
+    expect(body.phase).not.toBe('not-deployed');
   });
 
   it('returns deploying when pods are not yet ready', async () => {
@@ -170,12 +127,13 @@ describe('GET /api/superset/status', () => {
       };
     });
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/status?namespace=test-ns');
+    const app = createTestApp(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.phase).toBe('deploying');
-    expect(res.body.healthy).toBe(false);
+    expect(body.phase).toBe('deploying');
+    expect(body.healthy).toBe(false);
   });
 
   it('returns running when all pods are ready and health check passes', async () => {
@@ -197,13 +155,14 @@ describe('GET /api/superset/status', () => {
 
     mockGetRouteUrl.mockResolvedValue('https://superset.apps.test.com');
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/status?namespace=test-ns');
+    const app = createTestApp(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.phase).toBe('running');
-    expect(res.body.healthy).toBe(true);
-    expect(res.body.url).toBe('https://superset.apps.test.com');
+    expect(body.phase).toBe('running');
+    expect(body.healthy).toBe(true);
+    expect(body.url).toBe('https://superset.apps.test.com');
   });
 
   it('returns error when pods are ready but health check fails', async () => {
@@ -227,11 +186,12 @@ describe('GET /api/superset/status', () => {
       getSupersetHealth: jest.fn().mockResolvedValue({ healthy: false }),
     });
 
-    const app = createApp();
-    const res = await request(app, '/api/superset/status?namespace=test-ns');
+    const app = createTestApp(supersetStatusRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/status?namespace=test-ns');
+    const body = res.body as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.body.phase).toBe('error');
-    expect(res.body.healthy).toBe(false);
+    expect(body.phase).toBe('error');
+    expect(body.healthy).toBe(false);
   });
 });
