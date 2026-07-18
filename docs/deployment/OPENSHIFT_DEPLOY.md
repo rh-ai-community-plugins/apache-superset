@@ -180,13 +180,13 @@ Users who deploy Superset instances need the following namespace-scoped permissi
 ```yaml
 - apiGroups: ["apps"]
   resources: ["deployments"]
-  verbs: ["create", "list", "delete"]
+  verbs: ["create", "get", "list", "update", "delete"]
 - apiGroups: [""]
   resources: ["services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
-  verbs: ["create", "list", "get", "delete"]
+  verbs: ["create", "get", "list", "update", "delete"]
 - apiGroups: ["route.openshift.io"]
   resources: ["routes"]
-  verbs: ["create", "list", "get", "delete"]
+  verbs: ["create", "get", "list", "update", "delete"]
 ```
 
 The plugin's Instance Management page checks permissions via `SelfSubjectAccessReview` and disables the Deploy button if the user lacks sufficient access.

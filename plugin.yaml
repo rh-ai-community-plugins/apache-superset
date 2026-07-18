@@ -55,7 +55,7 @@ remote:
 # --- RBAC (required) ---
 # The plugin itself requires no cluster roles at install time. However, users
 # who deploy Superset instances need namespace-scoped RBAC permissions for
-# create/list/delete on the following resources (via the BFF's K8s API calls):
+# create/get/list/update/delete on the following resources (via the BFF's K8s API calls):
 #   - apps/deployments
 #   - core/services, core/configmaps, core/secrets, core/persistentvolumeclaims
 #   - core/serviceaccounts
@@ -64,13 +64,13 @@ rbac:
   required_roles:
     - apiGroups: ["apps"]
       resources: ["deployments"]
-      verbs: ["create", "list", "delete"]
+      verbs: ["create", "get", "list", "update", "delete"]
     - apiGroups: [""]
       resources: ["services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
-      verbs: ["create", "list", "get", "delete"]
+      verbs: ["create", "get", "list", "update", "delete"]
     - apiGroups: ["route.openshift.io"]
       resources: ["routes"]
-      verbs: ["create", "list", "get", "delete"]
+      verbs: ["create", "get", "list", "update", "delete"]
   cluster_roles: false
 
 # --- Support (optional) ---

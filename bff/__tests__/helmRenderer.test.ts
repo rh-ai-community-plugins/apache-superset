@@ -77,22 +77,22 @@ const TEST_VALUES = {
 };
 
 describe('renderHelmTemplates — chartDir validation', () => {
-  it('rejects a path that does not contain Chart.yaml', () => {
+  it('rejects paths outside the allowed directories', () => {
     expect(() =>
       renderHelmTemplates(
         { releaseName: 'r', namespace: 'ns', values: {} },
         '/tmp/attacker/chart/charts/evil',
       ),
-    ).toThrow('chartDir does not contain a Chart.yaml');
+    ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
   });
 
-  it('rejects paths that do not exist', () => {
+  it('rejects arbitrary paths even if they exist', () => {
     expect(() =>
       renderHelmTemplates(
         { releaseName: 'r', namespace: 'ns', values: {} },
-        '/tmp/evil',
+        '/tmp',
       ),
-    ).toThrow('chartDir does not contain a Chart.yaml');
+    ).toThrow('chartDir must be within the chart/charts/ directory or match SUPERSET_CHART_DIR');
   });
 });
 
