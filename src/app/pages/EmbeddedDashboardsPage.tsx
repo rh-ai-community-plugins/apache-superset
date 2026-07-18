@@ -26,7 +26,7 @@ import { ROUTES } from '~/app/routes';
 import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { DashboardList } from '~/app/components/DashboardList';
 import { SupersetDashboardEmbed } from '~/app/components/SupersetDashboardEmbed';
-import '~/app/components/SupersetDashboardEmbed.css';
+import './EmbeddedDashboardsPage.css';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useSupersetDashboards } from '~/app/hooks/useSupersetDashboards';
 import { useSupersetGuestToken } from '~/app/hooks/useSupersetGuestToken';
