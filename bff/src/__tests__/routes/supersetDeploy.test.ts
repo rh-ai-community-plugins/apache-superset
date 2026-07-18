@@ -383,4 +383,127 @@ describe('DELETE /api/superset/deploy', () => {
     expect(body.message).toBe('No resources found');
     expect((body.deleted as Array<unknown>)).toHaveLength(0);
   });
+
+  it('skips PVC with helm.sh/resource-policy: keep when force is not set', async () => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: true },
+    });
+
+    const keepPvc: K8sResource = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: 'superset-postgres-pv',
+        namespace: 'test-ns',
+        annotations: { 'helm.sh/resource-policy': 'keep' },
+      },
+    };
+
+    mockListResources
+      .mockResolvedValueOnce({ apiVersion: 'apps/v1', kind: 'DeploymentList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'ServiceList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'ConfigMapList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'SecretList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'PVCList', items: [keepPvc] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'SAList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'route.openshift.io/v1', kind: 'RouteList', items: [] });
+
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns', {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as Record<string, unknown>;
+    expect((body.deleted as Array<unknown>)).toHaveLength(0);
+    expect(body.skipped).toEqual([{ kind: 'PersistentVolumeClaim', name: 'superset-postgres-pv' }]);
+    expect(mockDeleteResource).not.toHaveBeenCalled();
+  });
+
+  it('deletes PVC with helm.sh/resource-policy: keep when force=true', async () => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: true },
+    });
+
+    const keepPvc: K8sResource = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: 'superset-postgres-pv',
+        namespace: 'test-ns',
+        annotations: { 'helm.sh/resource-policy': 'keep' },
+      },
+    };
+
+    mockListResources
+      .mockResolvedValueOnce({ apiVersion: 'apps/v1', kind: 'DeploymentList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'ServiceList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'ConfigMapList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'SecretList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'PVCList', items: [keepPvc] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'SAList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'route.openshift.io/v1', kind: 'RouteList', items: [] });
+
+    mockDeleteResource.mockResolvedValueOnce(undefined);
+
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns&force=true', {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as Record<string, unknown>;
+    expect(body.deleted).toEqual([{ kind: 'PersistentVolumeClaim', name: 'superset-postgres-pv' }]);
+    expect(body.skipped).toBeUndefined();
+    expect(mockDeleteResource).toHaveBeenCalledWith(
+      'test-token',
+      'v1',
+      'PersistentVolumeClaim',
+      'test-ns',
+      'superset-postgres-pv',
+    );
+  });
+
+  it('deletes resources without helm.sh/resource-policy annotation normally', async () => {
+    mockK8sRequest.mockResolvedValueOnce({
+      status: { allowed: true },
+    });
+
+    const normalPvc: K8sResource = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: 'superset-postgres-pv',
+        namespace: 'test-ns',
+      },
+    };
+
+    mockListResources
+      .mockResolvedValueOnce({ apiVersion: 'apps/v1', kind: 'DeploymentList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'ServiceList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'ConfigMapList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'SecretList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'PVCList', items: [normalPvc] })
+      .mockResolvedValueOnce({ apiVersion: 'v1', kind: 'SAList', items: [] })
+      .mockResolvedValueOnce({ apiVersion: 'route.openshift.io/v1', kind: 'RouteList', items: [] });
+
+    mockDeleteResource.mockResolvedValueOnce(undefined);
+
+    const app = createTestApp(supersetDeployRouter, MOUNT_PATH);
+    const res = await testRequest(app, '/api/superset/deploy?namespace=test-ns', {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as Record<string, unknown>;
+    expect(body.deleted).toEqual([{ kind: 'PersistentVolumeClaim', name: 'superset-postgres-pv' }]);
+    expect(body.skipped).toBeUndefined();
+    expect(mockDeleteResource).toHaveBeenCalledWith(
+      'test-token',
+      'v1',
+      'PersistentVolumeClaim',
+      'test-ns',
+      'superset-postgres-pv',
+    );
+  });
 });
