@@ -91,7 +91,10 @@ describe('InstanceManagementPage', () => {
       refresh: mockRefresh,
     });
     render(<InstanceManagementPage />);
-    expect(screen.getByText('Deploying Superset')).toBeInTheDocument();
+    expect(screen.getByTestId('deployment-status-card')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('deployment-status-card')).getByText('Deploying Superset'),
+    ).toBeInTheDocument();
   });
 
   it('shows status card when running', () => {
@@ -241,5 +244,118 @@ describe('InstanceManagementPage', () => {
     });
     render(<InstanceManagementPage />);
     expect(screen.getByText('Instance Management')).toBeInTheDocument();
+  });
+
+  describe('aria-live status announcements', () => {
+    it('has a narrowed aria-live region with role="status"', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: { phase: 'running', healthy: true },
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+      expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
+    });
+
+    it('announces "Deploying Superset" during deploying phase', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: {
+          phase: 'deploying',
+          healthy: false,
+          resources: {
+            superset: { ready: false },
+            postgres: { ready: false },
+          },
+        },
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveTextContent('Deploying Superset');
+    });
+
+    it('announces "Superset is running and healthy" when running and healthy', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: {
+          phase: 'running',
+          healthy: true,
+          resources: {
+            superset: { ready: true },
+            postgres: { ready: true },
+          },
+        },
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveTextContent('Superset is running and healthy');
+    });
+
+    it('announces "Superset is running" without "healthy" when not healthy', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: {
+          phase: 'running',
+          healthy: false,
+          resources: {
+            superset: { ready: true },
+            postgres: { ready: true },
+          },
+        },
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveTextContent('Superset is running');
+      expect(liveRegion).not.toHaveTextContent('healthy');
+    });
+
+    it('announces deployment error with message', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: {
+          phase: 'error',
+          healthy: false,
+          message: 'Pod crash loop',
+        },
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveTextContent('Deployment error: Pod crash loop');
+    });
+
+    it('has empty status announcement when loading with no status', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: null,
+        loading: true,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveTextContent('');
+    });
+
+    it('has empty status announcement for not-deployed phase', () => {
+      (useSupersetStatus as jest.Mock).mockReturnValue({
+        status: { phase: 'not-deployed', healthy: false },
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+      });
+      render(<InstanceManagementPage />);
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toHaveTextContent('');
+    });
   });
 });
