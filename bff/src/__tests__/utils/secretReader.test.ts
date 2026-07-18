@@ -15,7 +15,7 @@ jest.mock('../../utils/routeUrl', () => ({
   getRouteUrl: jest.fn(),
 }));
 
-import { getAdminCredentials, getSupersetUrl, isSecretNotFound } from '../../utils/secretReader';
+import { getAdminCredentials, isSecretNotFound } from '../../utils/secretReader';
 import { getResource } from '../../utils/k8sApply';
 import { K8sApiError } from '../../utils/k8sClient';
 import { getRouteUrl } from '../../utils/routeUrl';
@@ -100,27 +100,6 @@ describe('getAdminCredentials', () => {
 
     await expect(getAdminCredentials('test-token', 'my-ns')).rejects.toThrow(
       K8sApiError,
-    );
-  });
-});
-
-describe('getSupersetUrl', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockGetRouteUrl.mockResolvedValue(undefined);
-  });
-
-  it('returns Route URL when available', async () => {
-    mockGetRouteUrl.mockResolvedValue('https://superset.apps.example.com');
-
-    const url = await getSupersetUrl('test-token', 'my-ns');
-    expect(url).toBe('https://superset.apps.example.com');
-  });
-
-  it('falls back to internal service URL', async () => {
-    const url = await getSupersetUrl('test-token', 'my-ns');
-    expect(url).toBe(
-      'http://superset-superset-svc.my-ns.svc.cluster.local:8088',
     );
   });
 });
