@@ -38,6 +38,7 @@ import supersetGuestTokenRouter from '../../routes/supersetGuestToken';
 import { getAdminCredentials, isSecretNotFound } from '../../utils/secretReader';
 import { getUserInfo } from '../../utils/userIdentity';
 import { SupersetClient, SupersetApiError } from '../../utils/supersetClient';
+import { K8sApiError } from '../../utils/k8sClient';
 import { createTestApp, createTestAppNoToken, testRequest } from '../helpers/testServer';
 
 const mockGetAdminCredentials = getAdminCredentials as jest.MockedFunction<typeof getAdminCredentials>;
@@ -197,5 +198,24 @@ describe('GET /api/superset/guest-token', () => {
 
     expect(res.status).toBe(500);
     expect(body.error).toContain('Internal server error');
+  });
+
+  it('returns 500 when getUserInfo throws a K8sApiError', async () => {
+    mockGetAdminCredentials.mockResolvedValue({
+      username: 'admin',
+      password: 'secret',
+      supersetUrl: 'http://superset-svc.test-ns.svc.cluster.local:8088',
+    });
+    mockGetUserInfo.mockRejectedValue(new K8sApiError('Forbidden', 403, ''));
+
+    const app = createTestApp(supersetGuestTokenRouter, MOUNT_PATH);
+    const res = await testRequest(
+      app,
+      `/api/superset/guest-token?namespace=test-ns&dashboard=${VALID_DASHBOARD_UUID}`,
+    );
+    const body = res.body as Record<string, unknown>;
+
+    expect(res.status).toBe(500);
+    expect(body.error).toBe('Internal server error generating guest token');
   });
 });
