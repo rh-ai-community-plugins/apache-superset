@@ -37,7 +37,6 @@ import { useSupersetGuestToken } from '~/app/hooks/useSupersetGuestToken';
 import { useLastSelectedProject } from '~/app/hooks/useLastSelectedProject';
 import { SupersetDashboard } from '~/app/types';
 
-/** Number of skeleton placeholder cards shown while the dashboard list is loading. */
 const SKELETON_CARD_COUNT = 3;
 
 const EmbeddedDashboardsPage: React.FC = () => {
