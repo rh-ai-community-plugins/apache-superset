@@ -37,6 +37,9 @@ jest.mock('~/app/components/SupersetDashboardEmbed', () => ({
     <div data-testid="superset-embed">{dashboardId}</div>
   ),
 }));
+jest.mock('~/app/components/EmbedErrorBoundary', () => ({
+  EmbedErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 describe('EmbeddedDashboardsPage', () => {
   const mockRefreshDashboards = jest.fn();
@@ -69,7 +72,7 @@ describe('EmbeddedDashboardsPage', () => {
       expect(screen.getByText('Select a project to view available dashboards.')).toBeInTheDocument();
     });
 
-    it('shows spinner while checking status', () => {
+    it('shows loading skeleton while checking status', () => {
       (useSupersetStatus as jest.Mock).mockReturnValue({
         status: null,
         loading: true,
@@ -77,7 +80,7 @@ describe('EmbeddedDashboardsPage', () => {
         refresh: jest.fn(),
       });
       render(<EmbeddedDashboardsPage />);
-      expect(screen.getByLabelText('Checking Superset status')).toBeInTheDocument();
+      expect(screen.getByText('Checking Superset status')).toBeInTheDocument();
     });
 
     it('shows not-running state when Superset is not deployed', () => {
@@ -105,7 +108,7 @@ describe('EmbeddedDashboardsPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith(ROUTES.INSTANCE);
     });
 
-    it('shows spinner while loading dashboards', () => {
+    it('shows loading skeleton while loading dashboards', () => {
       (useSupersetStatus as jest.Mock).mockReturnValue({
         status: { phase: 'running', healthy: true, url: 'https://superset.example.com' },
         loading: false,
@@ -248,7 +251,7 @@ describe('EmbeddedDashboardsPage', () => {
       expect(screen.getByText('Open in Superset')).toBeInTheDocument();
     });
 
-    it('shows loading spinner while status is loading', () => {
+    it('shows loading skeleton while status is loading', () => {
       (useSupersetStatus as jest.Mock).mockReturnValue({
         status: null,
         loading: true,
@@ -256,7 +259,7 @@ describe('EmbeddedDashboardsPage', () => {
         refresh: jest.fn(),
       });
       render(<EmbeddedDashboardsPage />);
-      expect(screen.getByLabelText('Loading Superset connection')).toBeInTheDocument();
+      expect(screen.getByText('Loading Superset connection')).toBeInTheDocument();
     });
 
     it('shows not-running state when status loaded but Superset is not running', () => {
@@ -269,7 +272,7 @@ describe('EmbeddedDashboardsPage', () => {
       render(<EmbeddedDashboardsPage />);
       expect(screen.getByText('Superset is not running')).toBeInTheDocument();
       expect(screen.getByText('Go to Instance Management')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Loading Superset connection')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading Superset connection')).not.toBeInTheDocument();
     });
 
     it('shows not-running state when status loaded but url is missing', () => {
@@ -281,7 +284,7 @@ describe('EmbeddedDashboardsPage', () => {
       });
       render(<EmbeddedDashboardsPage />);
       expect(screen.getByText('Superset is not running')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Loading Superset connection')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading Superset connection')).not.toBeInTheDocument();
     });
 
     it('navigates to instance page from not-running state in embed view', async () => {

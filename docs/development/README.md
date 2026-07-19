@@ -9,3 +9,4 @@ Guides for setting up a local development environment and working with the dashb
 - [LOCAL_SETUP.md](LOCAL_SETUP.md) -- Complete guide to setting up the RHOAI Dashboard and plugin dev server locally, including prerequisites, dashboard configuration, BFF setup, and hot reload workflow.
 - [CUSTOMIZATION.md](CUSTOMIZATION.md) -- Lists the required and optional deliverables (container images, Helm chart, plugin.yaml), their naming conventions, and how to rename identifiers.
 - [BUILD_AND_PUSH.md](BUILD_AND_PUSH.md) -- Building and pushing container images (frontend and BFF) to Quay.io, scanning for vulnerabilities with Trivy, and the CI build workflow. Also covers the Makefile that wraps all common build tasks.
+- [TESTING.md](TESTING.md) -- Manual integration test plan with end-to-end scenarios, RBAC verification, error handling, and instructions for running automated tests.
