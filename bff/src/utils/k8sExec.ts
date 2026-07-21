@@ -99,7 +99,6 @@ export function k8sExec(options: K8sExecOptions): K8sExecHandle {
 
   let closed = false;
   let statusReceived = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
 
   const finish = (exitCode: number | null, errorMessage?: string) => {
     if (closed) return;
@@ -108,7 +107,7 @@ export function k8sExec(options: K8sExecOptions): K8sExecHandle {
     onClose(exitCode, errorMessage);
   };
 
-  timer = setTimeout(() => {
+  const timer = setTimeout(() => {
     if (!closed) {
       finish(null, `Command timed out after ${timeoutMs}ms`);
       ws.close();

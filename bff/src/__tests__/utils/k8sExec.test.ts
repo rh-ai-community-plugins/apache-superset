@@ -1,9 +1,17 @@
 import { EventEmitter } from 'events';
 
-const mockWsInstances: any[] = [];
+interface MockWs extends EventEmitter {
+  url: string;
+  protocols: string[];
+  options: { headers: Record<string, string>; [key: string]: unknown };
+  close: jest.Mock;
+  readyState: number;
+}
+
+const mockWsInstances: MockWs[] = [];
 
 jest.mock('ws', () => {
-  return jest.fn().mockImplementation(function (this: any, url: string, protocols: string[], options: any) {
+  return jest.fn().mockImplementation(function (this: MockWs, url: string, protocols: string[], options: Record<string, unknown>) {
     const emitter = new EventEmitter();
     Object.assign(emitter, {
       url,
@@ -12,8 +20,9 @@ jest.mock('ws', () => {
       close: jest.fn(() => emitter.emit('close')),
       readyState: 1,
     });
-    mockWsInstances.push(emitter);
-    return emitter;
+    const mock = emitter as unknown as MockWs;
+    mockWsInstances.push(mock);
+    return mock;
   });
 });
 

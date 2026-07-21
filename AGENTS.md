@@ -68,6 +68,7 @@ The plugin has two pages, routed under `/apache-superset/*`:
 - `useSupersetStatus` — Polls BFF for deployment status with adaptive intervals (10s while deploying, 30s when stable). Returns `status`, `loading`, `error`, `refresh()`.
 - `useSupersetDashboards` — Fetches dashboard list from BFF. Returns `dashboards[]`, `loading`, `error`, `refresh()`.
 - `useSupersetGuestToken` — Returns a `() => Promise<string>` callback for fetching scoped guest tokens for dashboard embedding.
+- `useLoadExamples` — Triggers `superset load-examples` via BFF, streams real-time log output over SSE. Returns `start()`, `status`, `logs`, and `error`.
 
 **Infrastructure hooks:**
 
@@ -86,6 +87,7 @@ The `bff/` directory contains a standalone Express.js + TypeScript backend servi
 3. **Guest token generation** — Authenticates to Superset REST API with admin credentials (from K8s Secret), maps RHOAI user identity to scoped guest tokens
 4. **Dashboard listing** — Proxies paginated dashboard list from Superset API with embeddedId resolution
 5. **Instance configuration** — Returns deployment mode, version, and embedding status
+6. **Load examples** — Executes `superset load-examples` inside the Superset pod via K8s exec WebSocket, streaming stdout/stderr back to the frontend
 
 API routes (all require Bearer token via auth middleware):
 
@@ -95,6 +97,7 @@ API routes (all require Bearer token via auth middleware):
 - `GET /api/superset/config` — Get instance configuration
 - `GET /api/superset/dashboards` — List dashboards (paginated)
 - `GET /api/superset/guest-token` — Generate embedding guest token
+- `POST /api/superset/load-examples` — Trigger `superset load-examples` via WebSocket exec with streaming output
 - `GET /api/health` — Health check (no auth)
 
 The dashboard proxies requests from `/apache-superset/api/*` to this service, forwarding the user's Bearer token. See `docs/architecture/BFF_PATTERN.md` for the general BFF pattern and `docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md` for the Superset-specific BFF design.
@@ -104,6 +107,7 @@ The dashboard proxies requests from `/apache-superset/api/*` to this service, fo
 - `@superset-ui/embedded-sdk` — Official React SDK for embedding Superset dashboards via guest tokens
 - `@patternfly/react-core`, `@patternfly/react-icons`, `@patternfly/react-table` — PatternFly 6 UI components
 - `express`, `js-yaml` — BFF server and Helm template YAML parsing
+- `ws` — WebSocket client for K8s exec API (used by load-examples to stream command output from pods)
 
 ### Entry Point Chain
 

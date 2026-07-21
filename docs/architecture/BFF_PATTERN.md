@@ -99,19 +99,33 @@ bff/
   tsconfig.json
   Containerfile             # UBI9 Node 22, runs on port 3000
   src/
-    server.ts               # Express app with health check (Superset routes added per phase)
-    types.ts                # Shared types (K8sMetadata, K8sResource, K8sList; Superset types added per phase)
+    server.ts               # Express app — mounts all route handlers + health check
+    types.ts                # Shared types (K8sMetadata, K8sResource, K8sList, Superset types)
+    middleware/
+      auth.ts               # Bearer token extraction middleware
     routes/
-      superset/             # Superset-specific route handlers (added per phase)
-        deploy.ts           # POST/DELETE /api/superset/deploy — lifecycle management
-        status.ts           # GET  /api/superset/status       — health + readiness
-        guestToken.ts       # GET  /api/superset/guest-token  — generate embed token
-        dashboards.ts       # GET  /api/superset/dashboards   — list dashboards
+      supersetDeploy.ts     # POST/DELETE /api/superset/deploy — lifecycle management
+      supersetStatus.ts     # GET  /api/superset/status       — health + readiness
+      supersetConfig.ts     # GET  /api/superset/config       — instance configuration
+      supersetGuestToken.ts # GET  /api/superset/guest-token  — generate embed token
+      supersetDashboards.ts # GET  /api/superset/dashboards   — list dashboards
+      supersetLoadExamples.ts # POST /api/superset/load-examples — trigger load-examples
     utils/
       k8sClient.ts          # Authenticated K8s API caller
+      k8sApply.ts           # Apply/delete K8s resources
+      k8sExec.ts            # WebSocket exec into pods
+      helmRenderer.ts       # In-process Helm template rendering
+      supersetClient.ts     # Superset REST API client with auth
+      secretReader.ts       # Read Superset credentials from K8s Secrets
+      httpRequest.ts        # Shared HTTP request utility
+      podFinder.ts          # Find pods by label selector
+      routeUrl.ts           # Resolve OpenShift Route URLs
+      resourceNames.ts      # Compute Helm-style resource names
+      userIdentity.ts       # Extract user identity from token
+      routeHelpers.ts       # Shared route handler utilities
   __tests__/
-    k8sClient.test.ts
-    superset/               # Superset route tests (added per phase)
+    routes/                 # Route handler tests
+    utils/                  # Utility tests
 ```
 
 ### Endpoint: `GET /api/superset/status`

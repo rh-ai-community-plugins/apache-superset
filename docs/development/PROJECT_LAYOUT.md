@@ -15,8 +15,14 @@ Directory structure of the plugin.
 │       ├── components/             #   Shared UI components
 │       │   ├── CommunityBanner.tsx  #     [SHARED] "Community Plugin" banner — do not modify
 │       │   ├── CommunityBanner.css  #     [SHARED] Banner styles — do not modify
-│       │   ├── ApacheSupersetNavIcon.tsx#     [PLUGIN-SPECIFIC] Your plugin's sidebar icon
-│       │   └── ProjectSelector.tsx #     Project selector with fuzzy search and favorites
+│       │   ├── ApacheSupersetNavIcon.tsx #    [PLUGIN-SPECIFIC] Your plugin's sidebar icon
+│       │   ├── ProjectSelector.tsx  #    Project selector with fuzzy search and favorites
+│       │   ├── DeployForm.tsx       #    Superset deploy form with namespace + RBAC check
+│       │   ├── DeploymentStatusCard.tsx # Running instance status card
+│       │   ├── DashboardList.tsx     #    Paginated dashboard list with embed buttons
+│       │   ├── SupersetDashboardEmbed.tsx # Embedded dashboard iframe wrapper
+│       │   ├── LoadExamplesModal.tsx #    Modal with streaming log output for load-examples
+│       │   └── EmbedErrorBoundary.tsx #  Error boundary for embedded dashboard iframes
 │       ├── pages/                  #   One file per page/route
 │       │   ├── InstanceManagementPage.tsx  # Deploy, monitor, and manage the Superset instance
 │       │   └── EmbeddedDashboardsPage.tsx  # Browse and embed Superset dashboards inline
@@ -25,7 +31,12 @@ Directory structure of the plugin.
 │           ├── useProjects.ts      #     K8s API
 │           ├── useFavoriteProjects.ts  # localStorage-backed project favorites
 │           ├── useLastSelectedProject.ts # localStorage-backed last selected project
-│           └── useAccessReview.ts  #     RBAC check via SelfSubjectAccessReview
+│           ├── useAccessReview.ts  #     RBAC check via SelfSubjectAccessReview
+│           ├── useSupersetDeployment.ts # Deploy and teardown via BFF
+│           ├── useSupersetStatus.ts #    Adaptive-interval status polling
+│           ├── useSupersetDashboards.ts # Dashboard list fetching
+│           ├── useSupersetGuestToken.ts # Guest token callback for embedding
+│           └── useLoadExamples.ts  #     Trigger load-examples with streaming logs
 ├── config/                          # Webpack configs
 │   ├── webpack.common.js            #   Module Federation setup, loaders, path alias (~ → src)
 │   ├── webpack.dev.js               #   Dev server (port 9500), proxy rules

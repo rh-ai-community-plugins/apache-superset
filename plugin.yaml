@@ -6,8 +6,8 @@ version: 0.1.0
 
 # --- Maintainer (required) ---
 maintainer:                          # [PLUGIN-SPECIFIC]
-  name: Your Name                    # [PLUGIN-SPECIFIC] replace with maintainer's name
-  github: your-github-handle        # [PLUGIN-SPECIFIC] replace with maintainer's GitHub handle
+  name: Guillaume Moutier                    # [PLUGIN-SPECIFIC] replace with maintainer's name
+  github: guimou        # [PLUGIN-SPECIFIC] replace with maintainer's GitHub handle
 
 # --- RHOAI compatibility (required) ---
 rhoai_compatibility:                 # [PLUGIN-SPECIFIC]

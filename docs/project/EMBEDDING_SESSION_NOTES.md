@@ -17,6 +17,7 @@ The `GET /api/v1/dashboard/` endpoint does not include the `embedded` relationsh
 The `POST /api/v1/security/guest_token/` endpoint requires a valid CSRF token + session cookie, even when authenticated with a bearer token. The `WTF_CSRF_EXEMPT_LIST` with blueprint name `"superset.security.api"` does not exempt this endpoint.
 
 **Fix applied:** `generateGuestToken()` now implements a two-step flow:
+
 1. `GET /api/v1/security/csrf_token/` — fetches CSRF token and captures `Set-Cookie` session header
 2. `POST /api/v1/security/guest_token/` — sends `X-CSRFToken` header and `Cookie` header alongside the bearer token
 
@@ -33,6 +34,7 @@ The BFF was resolving the Superset URL by preferring the OpenShift Route (extern
 Setting `GUEST_ROLE_NAME = "Public"` and adding permissions to the Public role causes the admin user's dashboard list API to return zero results. The Public role is special in Superset and modifying it has side effects on all users.
 
 **Fix applied:**
+
 - `superset_config.py` in the ConfigMap now sets `GUEST_ROLE_NAME = "EmbedGuest"`
 - A new `init-embed-role.py` script in the ConfigMap is executed by the init container after `superset init`
 - The script creates the `EmbedGuest` role (idempotent) and grants it the required permissions:
@@ -42,18 +44,21 @@ Setting `GUEST_ROLE_NAME = "Public"` and adding permissions to the Public role c
 ### 5. Per-dashboard embedding must be enabled in the Superset UI
 
 The `EMBEDDED_SUPERSET: True` feature flag (already set by the Helm chart) enables the embedding feature globally, but each dashboard must be individually configured:
+
 - Dashboard → three-dot menu → "Embed dashboard"
 - Enter the RHOAI Dashboard origin in "Allowed domains"
 
 ## Current State
 
 ### What works
+
 - Dashboard list endpoint returns dashboards with correct `embeddedId` resolution
 - CSRF token flow for guest token generation is implemented
 - BFF uses in-cluster service URL for Superset API calls
 - Helm chart templates updated for `EmbedGuest` role auto-creation
 
 ### What needs testing
+
 - The `EmbedGuest` role has not been tested end-to-end yet — the role needs to be created (either via teardown+redeploy or manually in Superset UI) and the embedded dashboard iframe needs to be verified
 - The 403 Forbidden on the embedded iframe (`/embedded/{uuid}`) may need additional permissions on the `EmbedGuest` role (e.g., `can_read on CurrentUserRestApi` exists in Superset 6.x but not 4.1.1)
 
