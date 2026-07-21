@@ -24,16 +24,18 @@ Build and push container images to Quay.io.
 
 Arguments:
   TARGET    Which image to build: frontend, bff, superset, or all (default: all)
-  VERSION   Version tag for the images (e.g. 0.5.0, 0.5.0-rc1). If omitted,
-            the next minor version is computed from existing git tags and you
-            are prompted to confirm before proceeding.
+  VERSION   Version tag for frontend and BFF images (e.g. 0.5.0, 0.5.0-rc1).
+            If omitted, the next minor version is computed from existing git
+            tags and you are prompted to confirm before proceeding.
+            The superset target always uses the upstream Superset version from
+            Containerfile.superset (currently $(sed -nE 's/^FROM\s+.*superset:([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' Containerfile.superset)), ignoring VERSION.
 
 Examples:
   $(basename "$0")                  # Build+push all, auto-version with confirmation
   $(basename "$0") frontend         # Build+push frontend only, auto-version
   $(basename "$0") bff 0.5.0-rc1    # Build+push BFF with explicit version
-  $(basename "$0") superset 0.5.0   # Build+push Superset server with explicit version
-  $(basename "$0") all 0.5.0        # Build+push all with explicit version
+  $(basename "$0") superset         # Build+push Superset server (always tagged with upstream version)
+  $(basename "$0") all 0.5.0        # Build+push all (frontend+BFF use 0.5.0, superset uses upstream version)
 EOF
 }
 
@@ -49,6 +51,13 @@ bff_context="."
 superset_image_name="apache-superset-server"
 superset_containerfile="Containerfile.superset"
 superset_context="."
+
+# Extract the Superset upstream version from the Containerfile base image tag.
+# The Superset server image is tagged with this version (not the plugin version)
+# so that the Helm sub-chart's appVersion resolves to a matching image.
+get_superset_version() {
+    sed -nE 's/^FROM\s+.*superset:([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' "${superset_containerfile}"
+}
 
 # Get the next semantic version tag
 get_next_version() {
@@ -149,6 +158,15 @@ process_target() {
             ;;
     esac
 
+    # Superset server image uses the upstream Superset version, not the plugin version
+    if [[ "${target}" == "superset" ]]; then
+        version=$(get_superset_version)
+        if [[ -z "${version}" ]]; then
+            log_error "Could not extract Superset version from ${superset_containerfile}"
+            exit 1
+        fi
+    fi
+
     local full_image="${REGISTRY}/${image_name}:${version}"
 
     echo ""
@@ -182,7 +200,7 @@ main() {
             ;;
     esac
 
-    if [[ -z "${version}" ]]; then
+    if [[ -z "${version}" && "${target}" != "superset" ]]; then
         version=$(get_next_version)
         echo ""
         log_info "Proposed version: ${version}"

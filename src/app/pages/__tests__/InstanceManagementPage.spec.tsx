@@ -134,7 +134,7 @@ describe('InstanceManagementPage', () => {
     render(<InstanceManagementPage />);
 
     await user.click(screen.getByRole('button', { name: /tear down/i }));
-    expect(screen.getByText(/permanently lost/i)).toBeInTheDocument();
+    expect(screen.getByText(/unavailable until redeployed/i)).toBeInTheDocument();
   });
 
   it('calls teardown on modal confirm', async () => {
@@ -157,10 +157,70 @@ describe('InstanceManagementPage', () => {
     await user.click(screen.getByRole('button', { name: /tear down/i }));
 
     const modal = screen.getByLabelText('Confirm teardown');
+    await user.click(within(modal).getByLabelText(/I understand that Superset will be unavailable/i));
     await user.click(within(modal).getByRole('button', { name: /tear down/i }));
 
     await waitFor(() => {
-      expect(mockTeardown).toHaveBeenCalledWith('test-ns');
+      expect(mockTeardown).toHaveBeenCalledWith('test-ns', false);
+    });
+  });
+
+  it('passes force=true when delete data checkbox is checked', async () => {
+    const user = userEvent.setup();
+    (useSupersetStatus as jest.Mock).mockReturnValue({
+      status: {
+        phase: 'running',
+        healthy: true,
+        resources: {
+          superset: { ready: true },
+          postgres: { ready: true },
+        },
+      },
+      loading: false,
+      error: null,
+      refresh: mockRefresh,
+    });
+    render(<InstanceManagementPage />);
+
+    await user.click(screen.getByRole('button', { name: /tear down/i }));
+
+    const modal = screen.getByLabelText('Confirm teardown');
+    await user.click(within(modal).getByLabelText(/Also delete the PostgreSQL/i));
+    await user.click(within(modal).getByLabelText(/I understand that all data will be permanently/i));
+    await user.click(within(modal).getByRole('button', { name: /tear down/i }));
+
+    await waitFor(() => {
+      expect(mockTeardown).toHaveBeenCalledWith('test-ns', true);
+    });
+  });
+
+  it('shows teardown modal when abort is clicked during deploying phase', async () => {
+    const user = userEvent.setup();
+    (useSupersetStatus as jest.Mock).mockReturnValue({
+      status: {
+        phase: 'deploying',
+        healthy: false,
+        resources: {
+          superset: { ready: false },
+          postgres: { ready: false },
+        },
+      },
+      loading: false,
+      error: null,
+      refresh: mockRefresh,
+    });
+    render(<InstanceManagementPage />);
+
+    await user.click(screen.getByRole('button', { name: /abort deployment/i }));
+
+    const modal = screen.getByLabelText('Confirm teardown');
+    expect(modal).toBeInTheDocument();
+
+    await user.click(within(modal).getByLabelText(/I understand that Superset will be unavailable/i));
+    await user.click(within(modal).getByRole('button', { name: /tear down/i }));
+
+    await waitFor(() => {
+      expect(mockTeardown).toHaveBeenCalledWith('test-ns', false);
     });
   });
 

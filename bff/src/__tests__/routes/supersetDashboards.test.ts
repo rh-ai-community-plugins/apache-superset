@@ -43,9 +43,14 @@ const MOUNT_PATH = '/api/superset/dashboards';
 describe('GET /api/superset/dashboards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     mockIsSecretNotFound.mockImplementation(
       (err) => err instanceof Error && err.message === 'Not found',
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('returns 401 when token is missing', async () => {

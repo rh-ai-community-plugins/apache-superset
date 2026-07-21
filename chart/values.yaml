@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 
 image:
-  repository: quay.io/OWNER/apache-superset
+  repository: quay.io/rh-ai-community-plugins/apache-superset
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -55,7 +55,7 @@ affinity: {}
 superset:
   enabled: false
   image:
-    repository: quay.io/OWNER/apache-superset-server
+    repository: quay.io/rh-ai-community-plugins/apache-superset-server
     tag: ""
   port: 8088
   admin:
@@ -114,7 +114,7 @@ superset:
 bff:
   enabled: true
   image:
-    repository: quay.io/OWNER/apache-superset-bff
+    repository: quay.io/rh-ai-community-plugins/apache-superset-bff
     tag: ""
     pullPolicy: IfNotPresent
   chartDir: /opt/app-root/src/chart-templates/superset

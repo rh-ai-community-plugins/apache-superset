@@ -35,8 +35,8 @@ describe('getAdminCredentials', () => {
       kind: 'Secret',
       metadata: { name: 'superset-superset-secret' },
       data: {
-        ADMIN_USERNAME: Buffer.from('admin').toString('base64'),
-        ADMIN_PASSWORD: Buffer.from('s3cret').toString('base64'),
+        SUPERSET_ADMIN_USERNAME: Buffer.from('admin').toString('base64'),
+        SUPERSET_ADMIN_PASSWORD: Buffer.from('s3cret').toString('base64'),
       },
     });
 
@@ -49,20 +49,22 @@ describe('getAdminCredentials', () => {
     );
   });
 
-  it('prefers Route URL over service URL', async () => {
+  it('always uses in-cluster service URL for server-to-server calls', async () => {
     mockGetResource.mockResolvedValue({
       apiVersion: 'v1',
       kind: 'Secret',
       metadata: { name: 'superset-superset-secret' },
       data: {
-        ADMIN_PASSWORD: Buffer.from('pass').toString('base64'),
+        SUPERSET_ADMIN_PASSWORD: Buffer.from('pass').toString('base64'),
       },
     });
     mockGetRouteUrl.mockResolvedValue('https://superset.apps.example.com');
 
     const creds = await getAdminCredentials('test-token', 'my-ns');
 
-    expect(creds.supersetUrl).toBe('https://superset.apps.example.com');
+    expect(creds.supersetUrl).toBe(
+      'http://superset-superset-svc.my-ns.svc.cluster.local:8088',
+    );
   });
 
   it('defaults username to admin when not in secret', async () => {
@@ -71,7 +73,7 @@ describe('getAdminCredentials', () => {
       kind: 'Secret',
       metadata: { name: 'superset-superset-secret' },
       data: {
-        ADMIN_PASSWORD: Buffer.from('pass').toString('base64'),
+        SUPERSET_ADMIN_PASSWORD: Buffer.from('pass').toString('base64'),
       },
     });
 

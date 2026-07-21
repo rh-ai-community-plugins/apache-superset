@@ -4,19 +4,6 @@ import { DeployForm, DeployFormProps } from '../DeployForm';
 import { useAccessReview } from '~/app/hooks/useAccessReview';
 
 jest.mock('~/app/hooks/useAccessReview');
-jest.mock('~/app/components/ProjectSelector', () => ({
-  ProjectSelector: ({
-    selectedProject,
-    onSelect,
-  }: {
-    selectedProject: string | null;
-    onSelect: (p: string | null) => void;
-  }) => (
-    <button data-testid="project-selector" onClick={() => onSelect('test-ns')}>
-      {selectedProject || 'Select a project'}
-    </button>
-  ),
-}));
 
 const allAllowed = [
   { verb: 'create', resource: 'deployments', group: 'apps', allowed: true },
@@ -34,11 +21,9 @@ const someDenied = [
 
 describe('DeployForm', () => {
   const onDeploy = jest.fn();
-  const onProjectSelect = jest.fn();
 
   const defaultProps: DeployFormProps = {
     selectedProject: 'test-ns',
-    onProjectSelect,
     onDeploy,
   };
 

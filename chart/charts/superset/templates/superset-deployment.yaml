@@ -90,6 +90,8 @@ spec:
               echo "$output"
               echo "Initializing Superset..."
               superset init
+              echo "Setting up EmbedGuest role..."
+              python /app/init-scripts/init-embed-role.py
               echo "Init complete."
           envFrom:
             - secretRef:
@@ -98,6 +100,10 @@ spec:
             - name: config
               mountPath: /app/pythonpath/superset_config.py
               subPath: superset_config.py
+              readOnly: true
+            - name: config
+              mountPath: /app/init-scripts/init-embed-role.py
+              subPath: init-embed-role.py
               readOnly: true
           resources:
             {{- toYaml .Values.initJob.resources | nindent 12 }}

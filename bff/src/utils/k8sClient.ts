@@ -30,6 +30,7 @@ export interface K8sRequestOptions {
   body?: unknown;
   contentType?: string;
   timeoutMs?: number;
+  lenientJson?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -39,7 +40,7 @@ export function k8sRequest<T = unknown>(
   path: string,
   options: K8sRequestOptions = {},
 ): Promise<T | undefined> {
-  const { method = 'GET', body, contentType = 'application/json', timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const { method = 'GET', body, contentType = 'application/json', timeoutMs = DEFAULT_TIMEOUT_MS, lenientJson = false } = options;
 
   const baseUrl = getK8sBaseUrl();
   const url = new URL(path, baseUrl);
@@ -58,7 +59,7 @@ export function k8sRequest<T = unknown>(
   let ca: Buffer | undefined;
 
   if (isHttps) {
-    if (process.env.K8S_API_BASE) {
+    if (process.env.K8S_TLS_INSECURE === 'true') {
       rejectUnauthorized = false;
     } else if (cachedCa) {
       ca = cachedCa;
@@ -73,6 +74,7 @@ export function k8sRequest<T = unknown>(
     timeoutMs,
     rejectUnauthorized,
     ca,
+    lenientJson,
     makeError: (statusCode, responseBody) =>
       new K8sApiError(
         `K8s API returned ${statusCode}`,

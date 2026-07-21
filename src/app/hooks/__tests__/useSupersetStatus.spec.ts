@@ -2,13 +2,23 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { useSupersetStatus } from '../useSupersetStatus';
 import { SupersetStatus } from '~/app/types';
 
+const originalConsoleError = console.error.bind(console);
+
 describe('useSupersetStatus', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     jest.useFakeTimers();
+    // Suppress React "not wrapped in act(...)" warnings — the hook's async poll()
+    // resolves fetch promises outside act boundaries, which is expected for a polling
+    // hook and does not affect test correctness.
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      if (typeof args[0] === 'string' && args[0].includes('not wrapped in act')) return;
+      originalConsoleError(...args);
+    });
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 

@@ -12,17 +12,25 @@ import {
   EmptyState,
   EmptyStateBody,
   Icon,
+  InputGroup,
+  InputGroupItem,
   Label,
   Progress,
   ProgressMeasureLocation,
   Spinner,
   Split,
   SplitItem,
+  TextInput,
+  Tooltip,
 } from '@patternfly/react-core';
 import {
   CheckCircleIcon,
+  CopyIcon,
   ExternalLinkAltIcon,
+  EyeIcon,
+  EyeSlashIcon,
   InProgressIcon,
+  CubesIcon,
 } from '@patternfly/react-icons';
 import { SupersetStatus } from '~/app/types';
 
@@ -34,6 +42,9 @@ export interface DeploymentStatusCardProps {
   tearing?: boolean;
   retrying?: boolean;
   deployError?: string | null;
+  onLoadExamples?: () => void;
+  onShowExamplesLog?: () => void;
+  loadingExamples?: boolean;
 }
 
 function isSafeUrl(url: string): boolean {
@@ -55,7 +66,19 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
   tearing,
   retrying,
   deployError,
+  onLoadExamples,
+  onShowExamplesLog,
+  loadingExamples,
 }) => {
+  const [passwordVisible, setPasswordVisible] = React.useState(false);
+  const [copiedField, setCopiedField] = React.useState<string | null>(null);
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    window.setTimeout(() => setCopiedField(null), 1500);
+  };
+
   if (status.phase === 'deploying') {
     const ready = readyCount(status);
     const total = 2;
@@ -85,6 +108,16 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
               {status.message}
             </p>
           )}
+          <div className="pf-v6-u-mt-md">
+            <Button
+              variant="danger"
+              onClick={onTeardown}
+              isLoading={tearing}
+              isDisabled={tearing}
+            >
+              Abort deployment
+            </Button>
+          </div>
         </CardBody>
       </Card>
     );
@@ -139,6 +172,74 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
                 </DescriptionListDescription>
               </DescriptionListGroup>
             )}
+            {status.credentials && (
+              <>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Username</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <div style={{ maxWidth: '300px' }}>
+                      <InputGroup>
+                        <InputGroupItem isFill>
+                          <TextInput
+                            readOnly
+                            value={status.credentials.username}
+                            type="text"
+                            aria-label="Username"
+                          />
+                        </InputGroupItem>
+                        <InputGroupItem>
+                          <Tooltip content={copiedField === 'username' ? 'Copied' : 'Copy username'}>
+                            <Button
+                              variant="control"
+                              aria-label="Copy username"
+                              onClick={() => copyToClipboard(status.credentials!.username, 'username')}
+                              icon={<CopyIcon />}
+                            />
+                          </Tooltip>
+                        </InputGroupItem>
+                      </InputGroup>
+                    </div>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Password</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <div style={{ maxWidth: '300px' }}>
+                      <InputGroup>
+                        <InputGroupItem isFill>
+                          <TextInput
+                            readOnly
+                            value={passwordVisible ? status.credentials.password : '•'.repeat(12)}
+                            type={passwordVisible ? 'text' : 'password'}
+                            aria-label="Password"
+                          />
+                        </InputGroupItem>
+                        <InputGroupItem>
+                          <Tooltip content={passwordVisible ? 'Hide password' : 'Show password'}>
+                            <Button
+                              variant="control"
+                              aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+                              onClick={() => setPasswordVisible((prev) => !prev)}
+                              icon={passwordVisible ? <EyeSlashIcon /> : <EyeIcon />}
+                            />
+                          </Tooltip>
+                        </InputGroupItem>
+                        <InputGroupItem>
+                          <Tooltip content={copiedField === 'password' ? 'Copied' : 'Copy password'}>
+                            <Button
+                              variant="control"
+                              aria-label="Copy password"
+                              onClick={() => copyToClipboard(status.credentials!.password, 'password')}
+                              icon={<CopyIcon />}
+                            />
+                          </Tooltip>
+                        </InputGroupItem>
+                      </InputGroup>
+                    </div>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+              </>
+            )}
             {status.resources && (
               <>
                 <DescriptionListGroup>
@@ -159,14 +260,41 @@ export const DeploymentStatusCard: React.FC<DeploymentStatusCardProps> = ({
             )}
           </DescriptionList>
           <div className="pf-v6-u-mt-md">
-            <Button
-              variant="danger"
-              onClick={onTeardown}
-              isLoading={tearing}
-              isDisabled={tearing}
-            >
-              Tear down
-            </Button>
+            <Split hasGutter>
+              {onLoadExamples && !loadingExamples && (
+                <SplitItem>
+                  <Button
+                    variant="secondary"
+                    icon={<CubesIcon />}
+                    onClick={onLoadExamples}
+                    isDisabled={tearing}
+                  >
+                    Load examples
+                  </Button>
+                </SplitItem>
+              )}
+              {loadingExamples && onShowExamplesLog && (
+                <SplitItem>
+                  <Button
+                    variant="secondary"
+                    onClick={onShowExamplesLog}
+                    isDisabled={tearing}
+                  >
+                    Show logs
+                  </Button>
+                </SplitItem>
+              )}
+              <SplitItem>
+                <Button
+                  variant="danger"
+                  onClick={onTeardown}
+                  isLoading={tearing}
+                  isDisabled={tearing}
+                >
+                  Tear down
+                </Button>
+              </SplitItem>
+            </Split>
           </div>
         </CardBody>
       </Card>

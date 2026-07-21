@@ -6,6 +6,7 @@ import { SupersetStatus } from '~/app/types';
 describe('DeploymentStatusCard', () => {
   const onTeardown = jest.fn();
   const onRetry = jest.fn();
+  const onLoadExamples = jest.fn();
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -41,6 +42,123 @@ describe('DeploymentStatusCard', () => {
     );
     expect(screen.getByText('Deploying Superset')).toBeInTheDocument();
     expect(screen.getByText('1 of 2 components ready')).toBeInTheDocument();
+  });
+
+  it('shows abort button during deploying phase and calls onTeardown', async () => {
+    const user = userEvent.setup();
+    const status: SupersetStatus = {
+      phase: 'deploying',
+      healthy: false,
+      resources: {
+        superset: { ready: false },
+        postgres: { ready: false },
+      },
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+      />,
+    );
+    const abortBtn = screen.getByRole('button', { name: /abort deployment/i });
+    expect(abortBtn).toBeEnabled();
+    await user.click(abortBtn);
+    expect(onTeardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows load examples button when running and onLoadExamples is provided', async () => {
+    const user = userEvent.setup();
+    const status: SupersetStatus = {
+      phase: 'running',
+      healthy: true,
+      resources: {
+        superset: { ready: true },
+        postgres: { ready: true },
+      },
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+        onLoadExamples={onLoadExamples}
+      />,
+    );
+    const btn = screen.getByRole('button', { name: /load examples/i });
+    expect(btn).toBeEnabled();
+    await user.click(btn);
+    expect(onLoadExamples).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows show-logs button instead of load-examples while loading', async () => {
+    const user = userEvent.setup();
+    const onShowExamplesLog = jest.fn();
+    const status: SupersetStatus = {
+      phase: 'running',
+      healthy: true,
+      resources: {
+        superset: { ready: true },
+        postgres: { ready: true },
+      },
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+        onLoadExamples={onLoadExamples}
+        onShowExamplesLog={onShowExamplesLog}
+        loadingExamples
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /load examples/i })).not.toBeInTheDocument();
+    const logBtn = screen.getByRole('button', { name: /show logs/i });
+    expect(logBtn).toBeEnabled();
+    await user.click(logBtn);
+    expect(onShowExamplesLog).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables load examples button while tearing down', () => {
+    const status: SupersetStatus = {
+      phase: 'running',
+      healthy: true,
+      resources: {
+        superset: { ready: true },
+        postgres: { ready: true },
+      },
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+        onLoadExamples={onLoadExamples}
+        tearing
+      />,
+    );
+    expect(screen.getByRole('button', { name: /load examples/i })).toBeDisabled();
+  });
+
+  it('disables abort button while tearing during deploying phase', () => {
+    const status: SupersetStatus = {
+      phase: 'deploying',
+      healthy: false,
+      resources: {
+        superset: { ready: false },
+        postgres: { ready: false },
+      },
+    };
+    render(
+      <DeploymentStatusCard
+        status={status}
+        onTeardown={onTeardown}
+        onRetry={onRetry}
+        tearing
+      />,
+    );
+    const abortBtn = screen.getByRole('button', { name: /abort deployment/i });
+    expect(abortBtn).toBeDisabled();
   });
 
   it('shows status details when running', () => {

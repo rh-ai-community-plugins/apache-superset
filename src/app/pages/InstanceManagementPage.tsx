@@ -3,8 +3,10 @@ import {
   Button,
   Card,
   CardBody,
+  Checkbox,
   Content,
   ContentVariants,
+  FormGroup,
   Modal,
   ModalBody,
   ModalFooter,
@@ -14,15 +16,30 @@ import {
 } from '@patternfly/react-core';
 import { DeployForm } from '~/app/components/DeployForm';
 import { DeploymentStatusCard } from '~/app/components/DeploymentStatusCard';
+import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { useSupersetDeployment } from '~/app/hooks/useSupersetDeployment';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useLastSelectedProject } from '~/app/hooks/useLastSelectedProject';
+import { useLoadExamples } from '~/app/hooks/useLoadExamples';
+import { LoadExamplesModal } from '~/app/components/LoadExamplesModal';
 
 const InstanceManagementPage: React.FC = () => {
   const [selectedProject, setSelectedProject] = useLastSelectedProject();
   const { status, loading: statusLoading, refresh } = useSupersetStatus(selectedProject);
   const { deploy, teardown, deploying, tearing, error: deployError } = useSupersetDeployment();
   const [teardownModalOpen, setTeardownModalOpen] = useState(false);
+  const [teardownAcknowledged, setTeardownAcknowledged] = useState(false);
+  const [deleteData, setDeleteData] = useState(false);
+  const [loadExamplesModalOpen, setLoadExamplesModalOpen] = useState(false);
+  const {
+    startLoadExamples,
+    logs: exampleLogs,
+    isRunning: examplesRunning,
+    isDone: examplesDone,
+    error: examplesError,
+    exitCode: examplesExitCode,
+    reset: resetExamples,
+  } = useLoadExamples();
 
   const handleDeploy = useCallback(
     async (namespace: string) => {
@@ -33,12 +50,20 @@ const InstanceManagementPage: React.FC = () => {
     [deploy, refresh],
   );
 
+  const handleLoadExamples = useCallback(() => {
+    if (!selectedProject) return;
+    resetExamples();
+    setLoadExamplesModalOpen(true);
+    startLoadExamples(selectedProject);
+  }, [selectedProject, startLoadExamples, resetExamples]);
+
   const handleTeardown = useCallback(async () => {
     if (!selectedProject) return;
+    const force = deleteData;
     setTeardownModalOpen(false);
-    const result = await teardown(selectedProject);
+    const result = await teardown(selectedProject, force);
     if (result) refresh();
-  }, [selectedProject, teardown, refresh]);
+  }, [selectedProject, teardown, refresh, deleteData]);
 
   const showDeployForm =
     !statusLoading && (!status || status.phase === 'not-deployed');
@@ -65,6 +90,13 @@ const InstanceManagementPage: React.FC = () => {
         <Content component="p">
           Deploy, monitor, and manage your Apache Superset instance.
         </Content>
+        <FormGroup fieldId="project-selector" label="Project">
+          <ProjectSelector
+            selectedProject={selectedProject}
+            onSelect={setSelectedProject}
+            isDisabled={deploying || tearing}
+          />
+        </FormGroup>
       </PageSection>
 
       <PageSection hasBodyWrapper={false}>
@@ -89,7 +121,6 @@ const InstanceManagementPage: React.FC = () => {
         ) : showDeployForm ? (
           <DeployForm
             selectedProject={selectedProject}
-            onProjectSelect={setSelectedProject}
             onDeploy={handleDeploy}
             deploying={deploying}
             error={deployError}
@@ -98,11 +129,14 @@ const InstanceManagementPage: React.FC = () => {
           <DeploymentStatusCard
             status={status}
             loading={statusLoading}
-            onTeardown={() => setTeardownModalOpen(true)}
+            onTeardown={() => { setTeardownAcknowledged(false); setDeleteData(false); setTeardownModalOpen(true); }}
             onRetry={() => { if (selectedProject) handleDeploy(selectedProject); }}
             tearing={tearing}
             retrying={deploying}
             deployError={deployError}
+            onLoadExamples={handleLoadExamples}
+            onShowExamplesLog={() => setLoadExamplesModalOpen(true)}
+            loadingExamples={examplesRunning}
           />
         ) : null}
       </PageSection>
@@ -110,32 +144,64 @@ const InstanceManagementPage: React.FC = () => {
       <Modal
         variant="small"
         isOpen={teardownModalOpen}
-        onClose={() => setTeardownModalOpen(false)}
+        onClose={() => { setTeardownModalOpen(false); setTeardownAcknowledged(false); setDeleteData(false); }}
         aria-label="Confirm teardown"
       >
         <ModalHeader
           title="Tear down Superset"
         />
         <ModalBody>
-          This will delete all Superset resources in project{' '}
-          <strong>{selectedProject}</strong>, including the PostgreSQL
-          PersistentVolumeClaim.{' '}
-          <strong>All dashboards and data will be permanently lost.</strong>
+          <Content component="p">
+            This will delete all Superset resources in project{' '}
+            <strong>{selectedProject}</strong> (Deployments, Services,
+            ConfigMaps, ServiceAccounts, and Routes).
+          </Content>
+          <Content component="p">
+            The PostgreSQL database and credentials are preserved by default so
+            your data can be recovered on a subsequent deploy.
+          </Content>
+          <Checkbox
+            id="teardown-delete-data"
+            label="Also delete the PostgreSQL database and credentials (PersistentVolumeClaim and Secret)"
+            description="All dashboards and data will be permanently lost."
+            isChecked={deleteData}
+            onChange={(_event, checked) => { setDeleteData(checked); setTeardownAcknowledged(false); }}
+            className="pf-v6-u-mt-md"
+          />
+          <Checkbox
+            id="teardown-acknowledge"
+            label={deleteData
+              ? 'I understand that all data will be permanently deleted'
+              : 'I understand that Superset will be unavailable until redeployed'}
+            isChecked={teardownAcknowledged}
+            onChange={(_event, checked) => setTeardownAcknowledged(checked)}
+            className="pf-v6-u-mt-sm"
+          />
         </ModalBody>
         <ModalFooter>
           <Button
             variant="danger"
             onClick={handleTeardown}
             isLoading={tearing}
-            isDisabled={tearing}
+            isDisabled={tearing || !teardownAcknowledged}
           >
             Tear down
           </Button>
-          <Button variant="link" onClick={() => setTeardownModalOpen(false)}>
+          <Button variant="link" onClick={() => { setTeardownModalOpen(false); setTeardownAcknowledged(false); setDeleteData(false); }}>
             Cancel
           </Button>
         </ModalFooter>
       </Modal>
+
+      <LoadExamplesModal
+        isOpen={loadExamplesModalOpen}
+        onClose={() => setLoadExamplesModalOpen(false)}
+        logs={exampleLogs}
+        isRunning={examplesRunning}
+        isDone={examplesDone}
+        error={examplesError}
+        exitCode={examplesExitCode}
+      />
     </>
   );
 };

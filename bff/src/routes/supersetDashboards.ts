@@ -7,6 +7,11 @@ import { requireToken, safeHttpStatus } from '../utils/routeHelpers';
 const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
+  // TODO: remove debug
+  console.log('[DEBUG-DASHBOARDS] Handler entered');
+  res.set('Cache-Control', 'no-store');
+  res.removeHeader('ETag');
+
   const token = requireToken(req, res);
   if (token === null) return;
 

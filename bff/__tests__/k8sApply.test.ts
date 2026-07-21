@@ -119,6 +119,64 @@ describe('applyResource', () => {
     );
   });
 
+  it('waits for a terminating resource to be deleted, then re-creates it', async () => {
+    const conflictError = new K8sApiError('conflict', 409, '{}');
+    const terminatingResource = {
+      ...configMap,
+      metadata: {
+        ...configMap.metadata,
+        resourceVersion: '55',
+        deletionTimestamp: '2026-07-21T10:00:00Z',
+      },
+    };
+    const notFoundError = new K8sApiError('not found', 404, '{}');
+
+    // 1: POST → 409
+    mockedK8sRequest.mockRejectedValueOnce(conflictError);
+    // 2: GET → terminating resource
+    mockedK8sRequest.mockResolvedValueOnce(terminatingResource);
+    // 3: poll GET → 404 (deleted)
+    mockedK8sRequest.mockRejectedValueOnce(notFoundError);
+    // 4: POST → created
+    mockedK8sRequest.mockResolvedValueOnce(configMap);
+
+    const result = await applyResource('token', configMap);
+
+    expect(mockedK8sRequest).toHaveBeenCalledTimes(4);
+    // Final call is a POST (re-create), not a PUT
+    expect(mockedK8sRequest).toHaveBeenNthCalledWith(
+      4,
+      'token',
+      '/api/v1/namespaces/my-ns/configmaps',
+      { method: 'POST', body: configMap },
+    );
+    expect(result).toEqual(configMap);
+  });
+
+  it('polls multiple times while resource is terminating', async () => {
+    const conflictError = new K8sApiError('conflict', 409, '{}');
+    const terminatingResource = {
+      ...configMap,
+      metadata: {
+        ...configMap.metadata,
+        resourceVersion: '55',
+        deletionTimestamp: '2026-07-21T10:00:00Z',
+      },
+    };
+    const notFoundError = new K8sApiError('not found', 404, '{}');
+
+    mockedK8sRequest.mockRejectedValueOnce(conflictError);    // POST → 409
+    mockedK8sRequest.mockResolvedValueOnce(terminatingResource); // GET → still there
+    mockedK8sRequest.mockResolvedValueOnce(terminatingResource); // poll → still there
+    mockedK8sRequest.mockRejectedValueOnce(notFoundError);       // poll → gone
+    mockedK8sRequest.mockResolvedValueOnce(configMap);           // POST → created
+
+    const result = await applyResource('token', configMap);
+
+    expect(mockedK8sRequest).toHaveBeenCalledTimes(5);
+    expect(result).toEqual(configMap);
+  });
+
   it('builds correct API path for namespaced core resource', async () => {
     mockedK8sRequest.mockResolvedValue({});
 

@@ -17,7 +17,7 @@ This guide walks through deploying the plugin on an OpenShift cluster that alrea
 Install directly from the OCI registry — no need to clone the repo:
 
 ```bash
-helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
+helm install apache-superset oci://quay.io/rh-ai-community-plugins/apache-superset-chart \
   --version 0.1.0 \
   --namespace apache-superset \
   --create-namespace
@@ -41,7 +41,7 @@ This creates:
 Pass `--set` flags to customize the installation:
 
 ```bash
-helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
+helm install apache-superset oci://quay.io/rh-ai-community-plugins/apache-superset-chart \
   --version 0.1.0 \
   --namespace apache-superset \
   --create-namespace \
@@ -51,7 +51,7 @@ helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
 To deploy the frontend only (no BFF):
 
 ```bash
-helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
+helm install apache-superset oci://quay.io/rh-ai-community-plugins/apache-superset-chart \
   --version 0.1.0 \
   --namespace apache-superset \
   --create-namespace \
@@ -281,7 +281,7 @@ oc delete namespace apache-superset   # optional: remove the namespace entirely
 
 | Parameter | Default | Description |
 |---|---|---|
-| `image.repository` | `quay.io/OWNER/apache-superset` | Frontend container image |
+| `image.repository` | `quay.io/rh-ai-community-plugins/apache-superset` | Frontend container image |
 | `image.tag` | `""` (defaults to appVersion) | Frontend image tag |
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy |
 | `replicaCount` | `1` | Frontend replicas |
@@ -297,7 +297,7 @@ oc delete namespace apache-superset   # optional: remove the namespace entirely
 | Parameter | Default | Description |
 |---|---|---|
 | `bff.enabled` | `true` | Deploy the BFF service |
-| `bff.image.repository` | `quay.io/OWNER/apache-superset-bff` | BFF container image |
+| `bff.image.repository` | `quay.io/rh-ai-community-plugins/apache-superset-bff` | BFF container image |
 | `bff.image.tag` | `""` (defaults to appVersion) | BFF image tag |
 | `bff.chartDir` | `/opt/app-root/src/chart-templates/superset` | Path to Superset Helm sub-chart templates inside the BFF container |
 | `bff.service.port` | `3000` | BFF Service port |
@@ -313,7 +313,7 @@ These values configure the on-demand Superset instances deployed by the BFF. Set
 | Parameter | Default | Description |
 |---|---|---|
 | `superset.enabled` | `false` | Pre-deploy Superset via Helm (normally deployed on-demand via UI) |
-| `superset.image.repository` | `quay.io/OWNER/apache-superset-server` | Superset container image |
+| `superset.image.repository` | `quay.io/rh-ai-community-plugins/apache-superset-server` | Superset container image |
 | `superset.image.tag` | `""` (defaults to appVersion) | Superset image tag |
 | `superset.port` | `8088` | Superset application port |
 | `superset.admin.username` | `admin` | Superset admin username |

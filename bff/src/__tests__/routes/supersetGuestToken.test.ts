@@ -52,9 +52,14 @@ const VALID_DASHBOARD_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 describe('GET /api/superset/guest-token', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     mockIsSecretNotFound.mockImplementation(
       (err) => err instanceof Error && err.message === 'Not found',
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('returns 401 when token is missing', async () => {

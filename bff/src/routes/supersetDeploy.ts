@@ -2,9 +2,9 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { SupersetDeployRequest, K8sResource } from '../types';
 import { renderHelmTemplates } from '../utils/helmRenderer';
-import { applyResource, listResources, deleteResource } from '../utils/k8sApply';
+import { applyResource, listResources, deleteResource, getResource } from '../utils/k8sApply';
 import { k8sRequest, K8sApiError } from '../utils/k8sClient';
-import { RELEASE_NAME, TEARDOWN_LABEL_SELECTOR, validateNamespace } from '../utils/resourceNames';
+import { RELEASE_NAME, TEARDOWN_LABEL_SELECTOR, validateNamespace, getSecretName } from '../utils/resourceNames';
 import { requireToken } from '../utils/routeHelpers';
 
 const router = Router();
@@ -28,6 +28,39 @@ function generateAlphanumericPassword(length: number): string {
     }
   }
   return result;
+}
+
+interface ExistingCredentials {
+  adminPassword: string;
+  secretKey: string;
+  postgresPassword: string;
+}
+
+async function getExistingCredentials(
+  token: string,
+  namespace: string,
+): Promise<ExistingCredentials | null> {
+  try {
+    const secret = await getResource<K8sResource & { data?: Record<string, string> }>(
+      token, 'v1', 'Secret', namespace, getSecretName(),
+    );
+    const data = secret.data;
+    if (!data) return null;
+
+    const decode = (key: string): string | undefined => {
+      const val = data[key];
+      return val ? Buffer.from(val, 'base64').toString('utf-8') : undefined;
+    };
+
+    const adminPassword = decode('SUPERSET_ADMIN_PASSWORD');
+    const secretKey = decode('SUPERSET_SECRET_KEY');
+    const postgresPassword = decode('POSTGRES_PASSWORD');
+
+    if (!adminPassword || !secretKey || !postgresPassword) return null;
+    return { adminPassword, secretKey, postgresPassword };
+  } catch {
+    return null;
+  }
 }
 
 interface SelfSubjectAccessReview {
@@ -129,9 +162,10 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const resolvedAdminPassword = adminPassword || generateSecret(24);
-    const resolvedSecretKey = secretKey || generateSecret(32);
-    const resolvedPostgresPassword = postgresPassword || generateAlphanumericPassword(24);
+    const existing = await getExistingCredentials(token, namespace);
+    const resolvedAdminPassword = adminPassword || existing?.adminPassword || generateSecret(24);
+    const resolvedSecretKey = secretKey || existing?.secretKey || generateSecret(32);
+    const resolvedPostgresPassword = postgresPassword || existing?.postgresPassword || generateAlphanumericPassword(24);
 
     const { resources, warnings } = renderHelmTemplates({
       releaseName: RELEASE_NAME,
@@ -146,6 +180,9 @@ router.post('/', async (req: Request, res: Response) => {
         },
         embedding: {
           allowedOrigins: dashboardOrigin,
+        },
+        route: {
+          enabled: true,
         },
       },
     });

@@ -4,7 +4,6 @@ import {
   Alert,
   Button,
   Form,
-  FormGroup,
   FormSection,
   Icon,
   List,
@@ -19,12 +18,10 @@ import {
   CheckCircleIcon,
   TimesCircleIcon,
 } from '@patternfly/react-icons';
-import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { useAccessReview, AccessReviewResult } from '~/app/hooks/useAccessReview';
 
 export interface DeployFormProps {
   selectedProject: string | null;
-  onProjectSelect: (project: string | null) => void;
   onDeploy: (namespace: string) => void;
   deploying?: boolean;
   error?: string | null;
@@ -37,7 +34,6 @@ function hasRequiredPermissions(results: AccessReviewResult[]): boolean {
 
 export const DeployForm: React.FC<DeployFormProps> = ({
   selectedProject,
-  onProjectSelect,
   onDeploy,
   deploying,
   error,
@@ -70,16 +66,6 @@ export const DeployForm: React.FC<DeployFormProps> = ({
   return (
     <>
       <Form data-testid="deploy-form">
-        <FormSection title="Project">
-          <FormGroup fieldId="project-selector" label="Select a project">
-            <ProjectSelector
-              selectedProject={selectedProject}
-              onSelect={onProjectSelect}
-              isDisabled={deploying}
-            />
-          </FormGroup>
-        </FormSection>
-
         {selectedProject && (
           <FormSection title="Permissions">
             {rbacLoading ? (

@@ -13,6 +13,10 @@ export interface SupersetStatus {
   version?: string;
   url?: string;
   message?: string;
+  credentials?: {
+    username: string;
+    password: string;
+  };
   resources?: {
     superset: ResourceStatus;
     postgres: ResourceStatus;

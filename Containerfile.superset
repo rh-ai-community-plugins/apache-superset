@@ -2,7 +2,8 @@ FROM docker.io/apache/superset:4.1.1
 
 USER 0
 
-RUN chgrp -R 0 /app/superset_home /app/pythonpath && \
+RUN pip install --no-cache-dir psycopg2-binary && \
+    chgrp -R 0 /app/superset_home /app/pythonpath && \
     chmod -R g=u /app/superset_home /app/pythonpath
 
 USER 1001:0

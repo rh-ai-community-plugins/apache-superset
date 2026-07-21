@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { SupersetStatus } from '../types';
 import { getResource } from '../utils/k8sApply';
-import { K8sApiError } from '../utils/k8sClient';
+import { K8sApiError, k8sRequest } from '../utils/k8sClient';
 import { SupersetClient } from '../utils/supersetClient';
-import { getDeploymentName, getPostgresDeploymentName, getSupersetServiceUrl, validateNamespace } from '../utils/resourceNames';
+import { getDeploymentName, getPostgresDeploymentName, getServiceName, SUPERSET_PORT, validateNamespace } from '../utils/resourceNames';
 import { getRouteUrl } from '../utils/routeUrl';
 import { requireToken } from '../utils/routeHelpers';
+import { getAdminCredentials } from '../utils/secretReader';
 
 const router = Router();
 
@@ -99,22 +100,28 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
+    const routeUrl = await getRouteUrl(token, namespace);
+    const directUrl = process.env.SUPERSET_URL || routeUrl;
+
     let healthy = false;
     let version: string | undefined;
 
     if (supersetDeployment.ready) {
       try {
-        const serviceUrl = getSupersetServiceUrl(namespace);
-        const client = SupersetClient.forHealthCheck(serviceUrl);
-        const health = await client.getSupersetHealth();
-        healthy = health.healthy;
-        version = health.version;
+        if (directUrl) {
+          const client = SupersetClient.forHealthCheck(directUrl);
+          const health = await client.getSupersetHealth();
+          healthy = health.healthy;
+          version = health.version;
+        } else {
+          const proxyPath = `/api/v1/namespaces/${namespace}/services/${getServiceName()}:${SUPERSET_PORT}/proxy/health`;
+          const response = await k8sRequest<unknown>(token, proxyPath, { timeoutMs: 5_000, lenientJson: true });
+          healthy = response === 'OK' || (typeof response === 'object' && response !== null);
+        }
       } catch {
         healthy = false;
       }
     }
-
-    const routeUrl = await getRouteUrl(token, namespace);
 
     const allReady = supersetDeployment.ready && postgresDeployment.ready;
 
@@ -127,11 +134,22 @@ router.get('/', async (req: Request, res: Response) => {
       phase = 'deploying';
     }
 
+    let credentials: SupersetStatus['credentials'];
+    if (phase === 'running') {
+      try {
+        const creds = await getAdminCredentials(token, namespace);
+        credentials = { username: creds.username, password: creds.password };
+      } catch {
+        // Secret may not be readable — omit credentials silently
+      }
+    }
+
     const status: SupersetStatus = {
       phase,
       healthy,
       version,
       url: routeUrl,
+      credentials,
       message: !allReady
         ? 'Waiting for pods to be ready'
         : !healthy

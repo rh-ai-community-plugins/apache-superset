@@ -54,9 +54,9 @@ The sections below document the underlying scripts that the Makefile wraps.
 ## Image Details
 
 - **Registry**: `quay.io`
-- **Frontend image**: `quay.io/OWNER/apache-superset`
-- **BFF image**: `quay.io/OWNER/apache-superset-bff`
-- **Superset server image**: `quay.io/OWNER/apache-superset-server`
+- **Frontend image**: `quay.io/rh-ai-community-plugins/apache-superset`
+- **BFF image**: `quay.io/rh-ai-community-plugins/apache-superset-bff`
+- **Superset server image**: `quay.io/rh-ai-community-plugins/apache-superset-server`
 
 The Superset server image (`Containerfile.superset`) is a thin layer on top of `apache/superset:4.1.1` that adjusts group permissions (`chgrp -R 0`, `chmod -R g=u`) on `/app/superset_home` and `/app/pythonpath` and switches to `USER 1001`, making it compatible with OpenShift's `restricted` SCC.
 
@@ -101,14 +101,14 @@ To build and push images manually without the script:
 
 ```bash
 podman login quay.io
-podman build -t quay.io/OWNER/apache-superset:0.5.0 -f Containerfile .
-podman push quay.io/OWNER/apache-superset:0.5.0
+podman build -t quay.io/rh-ai-community-plugins/apache-superset:0.5.0 -f Containerfile .
+podman push quay.io/rh-ai-community-plugins/apache-superset:0.5.0
 
-podman build -t quay.io/OWNER/apache-superset-bff:0.5.0 -f bff/Containerfile bff/
-podman push quay.io/OWNER/apache-superset-bff:0.5.0
+podman build -t quay.io/rh-ai-community-plugins/apache-superset-bff:0.5.0 -f bff/Containerfile bff/
+podman push quay.io/rh-ai-community-plugins/apache-superset-bff:0.5.0
 
-podman build -t quay.io/OWNER/apache-superset-server:0.5.0 -f Containerfile.superset .
-podman push quay.io/OWNER/apache-superset-server:0.5.0
+podman build -t quay.io/rh-ai-community-plugins/apache-superset-server:0.5.0 -f Containerfile.superset .
+podman push quay.io/rh-ai-community-plugins/apache-superset-server:0.5.0
 ```
 
 Buildah and Docker work the same way — substitute `buildah build` or `docker build`/`docker push`.
@@ -160,7 +160,7 @@ BUILDER=docker ./scripts/scan-image.sh   # Use Docker instead of Podman
 The `chart/` directory contains a Helm chart for deploying both the frontend and BFF to Kubernetes/OpenShift. The chart is published to the same Quay.io registry as an OCI artifact.
 
 - **Chart name**: `apache-superset-chart`
-- **OCI registry**: `oci://quay.io/OWNER/apache-superset-chart`
+- **OCI registry**: `oci://quay.io/rh-ai-community-plugins/apache-superset-chart`
 
 The chart version is kept in sync with the project version in `package.json` by the `scripts/sync-chart-version.js` script, which runs automatically on `npm version`.
 
@@ -190,7 +190,7 @@ make chart-push
 ### Install from OCI Registry
 
 ```bash
-helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
+helm install apache-superset oci://quay.io/rh-ai-community-plugins/apache-superset-chart \
   --version 0.1.0 \
   --namespace apache-superset \
   --create-namespace

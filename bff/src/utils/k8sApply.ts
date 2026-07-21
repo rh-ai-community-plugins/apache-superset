@@ -47,6 +47,31 @@ function kindToResource(kind: string): string {
   );
 }
 
+const TERMINATING_POLL_INTERVAL_MS = 1000;
+const TERMINATING_POLL_TIMEOUT_MS = 30000;
+
+async function waitForDeletion(
+  token: string,
+  resourcePath: string,
+  timeoutMs: number = TERMINATING_POLL_TIMEOUT_MS,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await k8sRequest<K8sResource>(token, resourcePath);
+    } catch (err) {
+      if (err instanceof K8sApiError && err.statusCode === 404) {
+        return;
+      }
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, TERMINATING_POLL_INTERVAL_MS));
+  }
+  throw new Error(
+    `Timed out waiting for ${resourcePath} to be deleted (${timeoutMs}ms)`,
+  );
+}
+
 export async function applyResource(
   token: string,
   resource: K8sResource,
@@ -70,6 +95,19 @@ export async function applyResource(
       if (existing === undefined) {
         throw new Error(`Unexpected empty response from K8s API: GET ${resourcePath}`);
       }
+
+      if (existing.metadata.deletionTimestamp) {
+        await waitForDeletion(token, resourcePath);
+        const created = await k8sRequest<K8sResource>(token, createPath, {
+          method: 'POST',
+          body: resource,
+        });
+        if (created === undefined) {
+          throw new Error(`Unexpected empty response from K8s API: POST ${createPath} (after deletion)`);
+        }
+        return created;
+      }
+
       const updated = {
         ...resource,
         metadata: {

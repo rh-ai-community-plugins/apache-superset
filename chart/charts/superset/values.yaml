@@ -1,5 +1,5 @@
 image:
-  repository: quay.io/OWNER/apache-superset-server
+  repository: quay.io/rh-ai-community-plugins/apache-superset-server
   tag: ""
   pullPolicy: IfNotPresent
 

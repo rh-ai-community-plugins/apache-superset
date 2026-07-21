@@ -217,6 +217,14 @@ describe('EmbeddedDashboardsPage', () => {
         error: null,
         refresh: jest.fn(),
       });
+      (useSupersetDashboards as jest.Mock).mockReturnValue({
+        dashboards: [
+          { id: 7, title: 'Sales Dashboard', url: '/d/7/', status: 'published', embeddedId: 'uuid-123' },
+        ],
+        loading: false,
+        error: null,
+        refresh: mockRefreshDashboards,
+      });
     });
 
     it('renders embedded dashboard component', () => {
@@ -225,10 +233,10 @@ describe('EmbeddedDashboardsPage', () => {
       expect(screen.getByText('uuid-123')).toBeInTheDocument();
     });
 
-    it('shows back button and toolbar', () => {
+    it('shows back button and toolbar with project and dashboard name', () => {
       render(<EmbeddedDashboardsPage />);
       expect(screen.getByLabelText('Back to dashboard list')).toBeInTheDocument();
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('test-ns / Sales Dashboard')).toBeInTheDocument();
     });
 
     it('navigates back when back button is clicked', async () => {
@@ -238,17 +246,13 @@ describe('EmbeddedDashboardsPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith(ROUTES.DASHBOARDS);
     });
 
-    it('shows fullscreen toggle', async () => {
-      const user = userEvent.setup();
+    it('shows open-in-Superset link pointing to the specific dashboard', () => {
       render(<EmbeddedDashboardsPage />);
-      const fullscreenBtn = screen.getByLabelText('Fullscreen');
-      await user.click(fullscreenBtn);
-      expect(screen.getAllByLabelText('Exit fullscreen').length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('shows open-in-Superset link', () => {
-      render(<EmbeddedDashboardsPage />);
-      expect(screen.getByText('Open in Superset')).toBeInTheDocument();
+      const link = screen.getByText('Open in Superset');
+      expect(link.closest('a')).toHaveAttribute(
+        'href',
+        'https://superset.example.com/superset/dashboard/7',
+      );
     });
 
     it('shows loading skeleton while status is loading', () => {

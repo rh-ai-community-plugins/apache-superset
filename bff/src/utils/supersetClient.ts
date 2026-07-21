@@ -1,3 +1,5 @@
+import http from 'http';
+import https from 'https';
 import {
   SupersetHealthResponse,
   SupersetLoginResponse,
@@ -131,24 +133,50 @@ export class SupersetClient {
     dashboardId: string,
     user: UserInfo,
   ): Promise<string> {
-    const response = await this.authenticatedRequest<{ token: string }>(
-      'POST',
-      '/api/v1/security/guest_token/',
-      {
-        user: {
-          username: user.userName,
-          first_name: user.firstName ?? user.userName,
-          last_name: user.lastName ?? '',
-        },
-        resources: [
-          {
-            type: 'dashboard',
-            id: dashboardId,
-          },
-        ],
-        rls: [],
+    const accessToken = await this.getAccessToken();
+    const csrf = await this.fetchCsrfToken(accessToken);
+
+    const guestTokenBody = {
+      user: {
+        username: user.userName,
+        first_name: user.firstName ?? user.userName,
+        last_name: user.lastName ?? '',
       },
-    );
+      resources: [
+        {
+          type: 'dashboard',
+          id: dashboardId,
+        },
+      ],
+      rls: [],
+    };
+
+    const url = new URL('/api/v1/security/guest_token/', this.baseUrl);
+    const isHttps = url.protocol === 'https:';
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+      'X-CSRFToken': csrf.csrfToken,
+    };
+    if (csrf.sessionCookie) {
+      headers['Cookie'] = csrf.sessionCookie;
+    }
+
+    const response = await httpRequest<{ token: string }>({
+      url: url.toString(),
+      method: 'POST',
+      headers,
+      body: guestTokenBody,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      rejectUnauthorized: isHttps ? this.rejectUnauthorized : undefined,
+      makeError: (statusCode, responseBody) =>
+        new SupersetApiError(
+          `Superset API returned ${statusCode} on POST /api/v1/security/guest_token/: ${responseBody}`,
+          statusCode,
+        ),
+    });
 
     if (response === undefined) {
       throw new SupersetApiError(
@@ -160,6 +188,75 @@ export class SupersetClient {
     return response.token;
   }
 
+  private fetchCsrfToken(
+    accessToken: string,
+  ): Promise<{ csrfToken: string; sessionCookie: string }> {
+    const url = new URL('/api/v1/security/csrf_token/', this.baseUrl);
+    const isHttps = url.protocol === 'https:';
+
+    const transport = isHttps ? https : http;
+
+    const requestOptions: http.RequestOptions = {
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname,
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      timeout: REQUEST_TIMEOUT_MS,
+    };
+
+    if (isHttps) {
+      (requestOptions as https.RequestOptions).rejectUnauthorized =
+        this.rejectUnauthorized;
+    }
+
+    return new Promise((resolve, reject) => {
+      const req = transport.request(requestOptions, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+            reject(
+              new SupersetApiError(
+                `Superset API returned ${res.statusCode} on GET /api/v1/security/csrf_token/: ${data}`,
+                res.statusCode ?? 0,
+              ),
+            );
+            return;
+          }
+
+          let csrfToken: string;
+          try {
+            const parsed = JSON.parse(data) as { result: string };
+            csrfToken = parsed.result;
+          } catch {
+            reject(new Error('Failed to parse CSRF token response'));
+            return;
+          }
+
+          const setCookies = res.headers['set-cookie'] ?? [];
+          const sessionCookie = setCookies
+            .map((c) => c.split(';')[0])
+            .join('; ');
+
+          resolve({ csrfToken, sessionCookie });
+        });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('CSRF token request timed out'));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  }
+
   async listDashboards(page = 0, pageSize = 100): Promise<DashboardListResult> {
     const path = `/api/v1/dashboard/?q=(page:${page},page_size:${pageSize})`;
     const response = await this.authenticatedRequest<{
@@ -168,7 +265,6 @@ export class SupersetClient {
         dashboard_title: string;
         url: string;
         status: string;
-        embedded?: Array<{ uuid: string }>;
         thumbnail_url?: string;
       }>;
       count: number;
@@ -177,6 +273,10 @@ export class SupersetClient {
       path,
     );
 
+    // TODO: remove debug logging
+    console.log('[DEBUG] Dashboard list response count:', response?.count, 'results:', response?.result?.length);
+    console.log('[DEBUG] Dashboard list raw:', JSON.stringify(response));
+
     if (response === undefined) {
       throw new SupersetApiError(
         `Empty response from Superset dashboard list endpoint: GET ${path}`,
@@ -184,19 +284,42 @@ export class SupersetClient {
       );
     }
 
+    const embeddedIds = await Promise.all(
+      response.result.map((d) => this.getDashboardEmbeddedId(d.id)),
+    );
+
     return {
-      dashboards: response.result.map((d) => ({
+      dashboards: response.result.map((d, i) => ({
         id: d.id,
         title: d.dashboard_title,
         url: d.url,
         status: d.status,
-        embeddedId: d.embedded?.[0]?.uuid,
+        embeddedId: embeddedIds[i],
         thumbnailUrl: d.thumbnail_url,
       })),
       totalCount: response.count,
       page,
       pageSize,
     };
+  }
+
+  private async getDashboardEmbeddedId(dashboardId: number): Promise<string | undefined> {
+    try {
+      const response = await this.authenticatedRequest<{
+        result: { uuid: string };
+      }>('GET', `/api/v1/dashboard/${dashboardId}/embedded`);
+      // TODO: remove debug logging
+      console.log(`[DEBUG] Dashboard ${dashboardId} embedded response:`, JSON.stringify(response));
+      return response?.result?.uuid;
+    } catch (err) {
+      // TODO: remove debug logging
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(`[DEBUG] Dashboard ${dashboardId} embedded error: ${msg}`);
+      if (err instanceof SupersetApiError && (err.statusCode === 404 || err.statusCode === 400)) {
+        return undefined;
+      }
+      throw err;
+    }
   }
 
   async getSupersetHealth(): Promise<SupersetHealthResponse> {
@@ -237,9 +360,9 @@ export class SupersetClient {
       body,
       timeoutMs: REQUEST_TIMEOUT_MS,
       rejectUnauthorized: isHttps ? this.rejectUnauthorized : undefined,
-      makeError: (statusCode) =>
+      makeError: (statusCode, responseBody) =>
         new SupersetApiError(
-          `Superset API returned ${statusCode} on ${method} ${path}`,
+          `Superset API returned ${statusCode} on ${method} ${path}: ${responseBody}`,
           statusCode,
         ),
       lenientJson: true,

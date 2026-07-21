@@ -41,7 +41,7 @@ If you have an OpenShift cluster with RHOAI already running, you can deploy this
 Install directly from the OCI registry — no need to clone this repo:
 
 ```bash
-helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
+helm install apache-superset oci://quay.io/rh-ai-community-plugins/apache-superset-chart \
   --version 0.1.0 \
   --namespace apache-superset \
   --create-namespace
@@ -165,6 +165,7 @@ A `Makefile` is also available for unified operations across frontend and BFF �
 
 See the [docs/](docs/) directory for detailed guides:
 
+- **[User Guide](docs/USER_GUIDE.md)** — End-user walkthrough: deploying Superset, loading example data, configuring dashboards for embedding, and viewing them inline
 - **[Architecture](docs/architecture/)** — Plugin system internals, BFF pattern, and the [Superset Plugin Architecture](docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md) design document
 - **[Development](docs/development/)** — Local environment setup, [customization guide](docs/development/CUSTOMIZATION.md), backend API reference, and [integration test plan](docs/development/TESTING.md)
 - **[Deployment](docs/deployment/)** — Deploying the plugin on OpenShift with Helm and dashboard registration

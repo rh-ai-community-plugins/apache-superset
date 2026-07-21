@@ -18,11 +18,11 @@ rhoai_compatibility:                 # [PLUGIN-SPECIFIC]
 deployment_model: cluster-shared     # per-project | cluster-shared | both
 
 image:                               # [PLUGIN-SPECIFIC]
-  repository: quay.io/OWNER/apache-superset
+  repository: quay.io/rh-ai-community-plugins/apache-superset
   tag: "0.1.0"
 
 bff_image:                           # [PLUGIN-SPECIFIC] (optional — only if using BFF pattern)
-  repository: quay.io/OWNER/apache-superset-bff
+  repository: quay.io/rh-ai-community-plugins/apache-superset-bff
   tag: "0.1.0"
 
 # --- Installation (required) ---
@@ -30,7 +30,7 @@ install:
   method: automatic                  # automatic | assisted | manual
   helm:
     chart_path: chart/
-    registry: oci://quay.io/OWNER/apache-superset-chart  # [PLUGIN-SPECIFIC]
+    registry: oci://quay.io/rh-ai-community-plugins/apache-superset-chart  # [PLUGIN-SPECIFIC]
   prerequisites: []
   instructions: https://github.com/rh-ai-community-plugins/apache-superset/blob/main/docs/deployment  # [PLUGIN-SPECIFIC]
 

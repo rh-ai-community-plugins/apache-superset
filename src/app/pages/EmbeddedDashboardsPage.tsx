@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
   Alert,
   Button,
@@ -19,8 +19,6 @@ import {
 } from '@patternfly/react-core';
 import {
   ArrowLeftIcon,
-  CompressIcon,
-  ExpandIcon,
   ExternalLinkAltIcon,
   SyncAltIcon,
 } from '@patternfly/react-icons';
@@ -30,7 +28,6 @@ import { ProjectSelector } from '~/app/components/ProjectSelector';
 import { DashboardList } from '~/app/components/DashboardList';
 import { SupersetDashboardEmbed } from '~/app/components/SupersetDashboardEmbed';
 import { EmbedErrorBoundary } from '~/app/components/EmbedErrorBoundary';
-import './EmbeddedDashboardsPage.css';
 import { useSupersetStatus } from '~/app/hooks/useSupersetStatus';
 import { useSupersetDashboards } from '~/app/hooks/useSupersetDashboards';
 import { useSupersetGuestToken } from '~/app/hooks/useSupersetGuestToken';
@@ -58,6 +55,10 @@ const EmbeddedDashboardsPage: React.FC = () => {
   const supersetDomain = status?.url ?? '';
 
   const fetchGuestToken = useSupersetGuestToken(selectedProject, embeddedId);
+
+  const currentDashboard = embeddedId
+    ? dashboards.find((d) => d.embeddedId === embeddedId)
+    : null;
 
   const handleSelectDashboard = useCallback(
     (dashboard: SupersetDashboard) => {
@@ -91,7 +92,9 @@ const EmbeddedDashboardsPage: React.FC = () => {
       <EmbedView
         embeddedId={embeddedId}
         supersetDomain={supersetDomain}
-        supersetUrl={status?.url}
+        dashboardId={currentDashboard?.id}
+        dashboardTitle={currentDashboard?.title}
+        projectName={selectedProject}
         fetchGuestToken={fetchGuestToken}
         onBack={handleBack}
       />
@@ -117,7 +120,9 @@ const EmbeddedDashboardsPage: React.FC = () => {
 interface EmbedViewProps {
   embeddedId: string;
   supersetDomain: string;
-  supersetUrl?: string;
+  dashboardId?: number;
+  dashboardTitle?: string;
+  projectName: string | null;
   fetchGuestToken: () => Promise<string>;
   onBack: () => void;
 }
@@ -125,15 +130,21 @@ interface EmbedViewProps {
 const EmbedView: React.FC<EmbedViewProps> = ({
   embeddedId,
   supersetDomain,
-  supersetUrl,
+  dashboardId,
+  dashboardTitle,
+  projectName,
   fetchGuestToken,
   onBack,
 }) => {
-  const [fullscreen, setFullscreen] = useState(false);
+  const supersetDashboardUrl = dashboardId
+    ? `${supersetDomain}/superset/dashboard/${dashboardId}`
+    : undefined;
+
+  const title = [projectName, dashboardTitle].filter(Boolean).join(' / ') || 'Dashboard';
 
   return (
-    <>
-      <PageSection hasBodyWrapper={false}>
+    <div className="superset-embed-layout">
+      <PageSection hasBodyWrapper={false} className="pf-v6-u-pb-0">
         <Toolbar>
           <ToolbarContent>
             <ToolbarItem>
@@ -146,56 +157,28 @@ const EmbedView: React.FC<EmbedViewProps> = ({
               </Button>
             </ToolbarItem>
             <ToolbarItem>
-              <Content component={ContentVariants.h1}>Dashboard</Content>
+              <Content component={ContentVariants.h1}>{title}</Content>
             </ToolbarItem>
             <ToolbarItem align={{ default: 'alignEnd' }}>
-              <Split hasGutter>
-                <SplitItem>
-                  <Button
-                    variant="plain"
-                    onClick={() => setFullscreen((f) => !f)}
-                    aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                  >
-                    {fullscreen ? <CompressIcon /> : <ExpandIcon />}
-                  </Button>
-                </SplitItem>
-                {supersetUrl && (
-                  <SplitItem>
-                    <Button
-                      variant="link"
-                      component="a"
-                      href={supersetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      icon={<ExternalLinkAltIcon />}
-                      iconPosition="end"
-                    >
-                      Open in Superset
-                    </Button>
-                  </SplitItem>
-                )}
-              </Split>
+              {supersetDashboardUrl && (
+                <Button
+                  variant="link"
+                  component="a"
+                  href={supersetDashboardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={<ExternalLinkAltIcon />}
+                  iconPosition="end"
+                >
+                  Open in Superset
+                </Button>
+              )}
             </ToolbarItem>
           </ToolbarContent>
         </Toolbar>
       </PageSection>
 
-      <PageSection
-        hasBodyWrapper={false}
-        isFilled
-        className={fullscreen ? 'superset-fullscreen-overlay' : undefined}
-      >
-        {fullscreen && (
-          <div className="pf-v6-u-mb-sm">
-            <Button
-              variant="plain"
-              onClick={() => setFullscreen(false)}
-              aria-label="Exit fullscreen"
-            >
-              <CompressIcon /> Exit fullscreen
-            </Button>
-          </div>
-        )}
+      <PageSection hasBodyWrapper={false} className="pf-v6-u-pt-0">
         <EmbedErrorBoundary key={embeddedId}>
           <SupersetDashboardEmbed
             dashboardId={embeddedId}
@@ -204,7 +187,7 @@ const EmbedView: React.FC<EmbedViewProps> = ({
           />
         </EmbedErrorBoundary>
       </PageSection>
-    </>
+    </div>
   );
 };
 

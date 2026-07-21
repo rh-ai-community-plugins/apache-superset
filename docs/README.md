@@ -2,6 +2,10 @@
 
 This directory contains all project documentation, organized by topic.
 
+## [User Guide](USER_GUIDE.md)
+
+End-user walkthrough: deploying Superset, loading example data, configuring dashboards for embedding, and viewing embedded dashboards in the RHOAI Dashboard.
+
 ## Sections
 
 ### [Architecture](architecture/)
