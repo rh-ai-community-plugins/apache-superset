@@ -18,6 +18,10 @@ A community plugin for the **Red Hat OpenShift AI (RHOAI) Dashboard** that deplo
 | **Instance Management** | Deploy, monitor, and tear down the Superset instance. Shows health status, deployment mode, and a load-examples button to populate sample data. |
 | **Embedded Dashboards** | Browse available dashboards and view them inline via the Superset Embedded SDK. |
 
+![superset-plugin-instance.png](img/superset-plugin-instance.png)
+
+![superset-plugin-dashboard.png](img/superset-plugin-dashboard.png)
+
 ### Integration Patterns Used
 
 The plugin uses all three dashboard integration patterns:
