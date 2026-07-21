@@ -1,0 +1,82 @@
+image:
+  repository: quay.io/rh-ai-community-plugins/apache-superset-server
+  tag: ""
+  pullPolicy: IfNotPresent
+
+port: 8088
+
+admin:
+  username: admin
+  password: ""
+  firstName: Superset
+  lastName: Admin
+  email: admin@superset.local
+
+embedding:
+  enabled: true
+  guestTokenJwtSecret: ""
+  guestTokenExpSeconds: 300
+  allowedOrigins: ""
+
+secretKey: ""
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+initJob:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+postgres:
+  image:
+    repository: registry.redhat.io/rhel9/postgresql-16
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  # password: PostgreSQL password for the 'superset' database user.
+  # CONSTRAINT: must contain only alphanumeric characters (A-Z, a-z, 0-9).
+  # The password is interpolated directly into the SQLAlchemy connection URI
+  # (postgresql+psycopg2://user:PASSWORD@host/db) without URL-encoding.
+  # Characters such as @, :, /, %, and # will make the URI malformed and
+  # prevent Superset from connecting to the database.
+  password: ""
+  database: superset
+  user: superset
+  persistence:
+    size: 5Gi
+    storageClass: ""
+    keepOnUninstall: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+tls:
+  forceHttps: "false"
+
+route:
+  enabled: false
+  host: ""
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+securityContext:
+  runAsNonRoot: true

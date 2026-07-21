@@ -9,13 +9,13 @@ A community plugin for the **Red Hat OpenShift AI (RHOAI) Dashboard** that deplo
 | **Deploy Superset on-demand** | One-click deployment of Superset + PostgreSQL into the user's namespace (lightweight mode: 2 pods, ~750m CPU / 768Mi RAM) |
 | **Embed dashboards inline** | Browse and view Superset dashboards directly inside the RHOAI Dashboard using the official [Embedded SDK](https://github.com/apache/superset/tree/master/superset-embedded-sdk) |
 | **Bridge authentication** | The user's OpenShift identity is mapped to Superset guest tokens — no separate login required |
-| **Manage data connections** | Connect Superset to data warehouses directly from the plugin UI |
+| **Load example data** | One-click loading of Superset's built-in sample datasets and dashboards with real-time log streaming |
 
 ### Pages
 
 | Page | Purpose |
 |---|---|
-| **Instance Management** | Deploy, monitor, and tear down the Superset instance. Shows health status, resource usage, and deployment mode. |
+| **Instance Management** | Deploy, monitor, and tear down the Superset instance. Shows health status, deployment mode, and a load-examples button to populate sample data. |
 | **Embedded Dashboards** | Browse available dashboards and view them inline via the Superset Embedded SDK. |
 
 ### Integration Patterns Used
@@ -24,7 +24,7 @@ The plugin uses all three dashboard integration patterns:
 
 - **Dashboard API** (`/api/status`) — user identity and config
 - **K8s API pass-through** (`/api/k8s/*`) — RBAC checks via SelfSubjectAccessReview
-- **BFF (Backend For Frontend)** — Superset deployment lifecycle, guest token generation, dashboard listing, and data source management
+- **BFF (Backend For Frontend)** — Superset deployment lifecycle, guest token generation, and dashboard listing
 
 The BFF service (`bff/` directory) is the core integration layer: it deploys Superset resources into K8s, authenticates to the Superset REST API with admin credentials, and generates scoped guest tokens for embedded dashboard access. See [Superset Plugin Architecture](docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md) for the full design.
 
@@ -41,7 +41,7 @@ If you have an OpenShift cluster with RHOAI already running, you can deploy this
 Install directly from the OCI registry — no need to clone this repo:
 
 ```bash
-helm install apache-superset oci://quay.io/OWNER/apache-superset-chart \
+helm install apache-superset oci://quay.io/rh-ai-community-plugins/apache-superset-chart \
   --version 0.1.0 \
   --namespace apache-superset \
   --create-namespace
@@ -165,8 +165,9 @@ A `Makefile` is also available for unified operations across frontend and BFF �
 
 See the [docs/](docs/) directory for detailed guides:
 
+- **[User Guide](docs/USER_GUIDE.md)** — End-user walkthrough: deploying Superset, loading example data, configuring dashboards for embedding, and viewing them inline
 - **[Architecture](docs/architecture/)** — Plugin system internals, BFF pattern, and the [Superset Plugin Architecture](docs/architecture/SUPERSET_PLUGIN_ARCHITECTURE.md) design document
-- **[Development](docs/development/)** — Local environment setup, [customization guide](docs/development/CUSTOMIZATION.md), and backend API reference
+- **[Development](docs/development/)** — Local environment setup, [customization guide](docs/development/CUSTOMIZATION.md), backend API reference, and [integration test plan](docs/development/TESTING.md)
 - **[Deployment](docs/deployment/)** — Deploying the plugin on OpenShift with Helm and dashboard registration
 
 ## License

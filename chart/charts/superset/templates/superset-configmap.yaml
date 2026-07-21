@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "superset.fullname" . }}-config
+  labels:
+    {{- include "superset.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+data:
+  superset_config.py: |
+    import os
+
+    # --- Core ---
+    SECRET_KEY = os.environ.get("SUPERSET_SECRET_KEY", "CHANGE_ME_IN_PRODUCTION")
+    SQLALCHEMY_DATABASE_URI = os.environ.get("SUPERSET_SQLALCHEMY_DATABASE_URI")
+
+    # --- Embedding ---
+    FEATURE_FLAGS = {
+        "EMBEDDED_SUPERSET": {{ if .Values.embedding.enabled }}True{{ else }}False{{ end }},
+        "ALERT_REPORTS": False,
+    }
+
+    GUEST_ROLE_NAME = "EmbedGuest"
+    GUEST_TOKEN_JWT_SECRET = os.environ.get("SUPERSET_GUEST_TOKEN_JWT_SECRET", SECRET_KEY)
+    GUEST_TOKEN_JWT_EXP_SECONDS = int(os.environ.get("SUPERSET_GUEST_TOKEN_JWT_EXP_SECONDS", "{{ .Values.embedding.guestTokenExpSeconds | int }}"))
+
+    # --- Security / CSP ---
+    TALISMAN_ENABLED = True
+    TALISMAN_CONFIG = {
+        "content_security_policy": {
+            "default-src": ["'self'"],
+            "img-src": ["'self'", "data:", "blob:"],
+            "worker-src": ["'self'", "blob:"],
+            "connect-src": ["'self'"],
+            "style-src": ["'self'", "'unsafe-inline'"],
+            "script-src": ["'self'", "'unsafe-eval'"],
+            "frame-ancestors": ["'self'"] + [
+                o.strip() for o in os.environ.get("SUPERSET_ALLOWED_ORIGINS", "").split(",") if o.strip()
+            ],
+        },
+        "frame_options": None,
+        "force_https": os.environ.get("SUPERSET_FORCE_HTTPS", "false").lower() == "true",
+    }
+
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
+    ENABLE_PROXY_FIX = True
+
+    # --- CSRF ---
+    WTF_CSRF_ENABLED = True
+    WTF_CSRF_EXEMPT_LIST = [
+        "superset.views.core.log",
+        "superset.views.core.explore_json",
+        "superset.charts.data.api.data",
+        "superset.dashboards.api.cache_dashboard_screenshot",
+        "superset.security.api",
+    ]
+
+    # --- Cache (lightweight mode — no Redis) ---
+    CACHE_CONFIG = {
+        "CACHE_TYPE": "SimpleCache",
+        "CACHE_DEFAULT_TIMEOUT": 300,
+    }
+    DATA_CACHE_CONFIG = CACHE_CONFIG
+    FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
+    EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
+
+    # --- Web server ---
+    SUPERSET_WEBSERVER_PORT = {{ .Values.port | int }}
+    ROW_LIMIT = 50000
+    SUPERSET_WEBSERVER_TIMEOUT = 120
+
+  init-embed-role.py: |
+    from superset.app import create_app
+    app = create_app()
+    with app.app_context():
+        from superset.extensions import security_manager
+        sm = security_manager
+        role_name = "EmbedGuest"
+        role = sm.find_role(role_name)
+        if role is None:
+            role = sm.add_role(role_name)
+            print("Created role: " + role_name)
+        else:
+            print("Role already exists: " + role_name)
+        permissions = [
+            ("can_read", "Dashboard"),
+            ("can_read", "Chart"),
+            ("can_read", "Dataset"),
+            ("can_list", "Dataset"),
+            ("can_get", "Dataset"),
+            ("can_read", "Database"),
+            ("can_list", "Database"),
+            ("can_get", "Database"),
+            ("can_read", "EmbeddedDashboard"),
+            ("can_read", "CurrentUserRestApi"),
+            ("can_explore", "Superset"),
+            ("can_explore_json", "Superset"),
+            ("can_log", "Superset"),
+            ("can_time_range", "Api"),
+        ]
+        for perm_name, view_name in permissions:
+            pv = sm.find_permission_view_menu(perm_name, view_name)
+            if pv and pv not in role.permissions:
+                sm.add_permission_role(role, pv)
+                print("  Added: " + perm_name + " on " + view_name)
+            elif pv:
+                print("  Already has: " + perm_name + " on " + view_name)
+            else:
+                print("  Not found: " + perm_name + " on " + view_name + " (skipped)")
+        sm.get_session.commit()
+        print("EmbedGuest role setup complete.")

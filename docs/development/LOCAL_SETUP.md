@@ -66,23 +66,44 @@ podman run --rm --network=host \
   bash -c "npm install pino-pretty && npm run start"
 ```
 
-### Step 3: Start the BFF service
+### Step 3: Port-forward the Superset service
 
-The BFF is a separate Node.js server that runs alongside the plugin's webpack dev server. It needs to know the cluster API server URL so it can make Kubernetes API calls with the user's forwarded token.
+Once Superset is deployed into a namespace (via the Instance Management page), the BFF needs to reach the Superset API for dashboard listing, guest token generation, and health checks. In local dev, the cluster-internal DNS (`svc.cluster.local`) is not reachable, so port-forward the Superset service:
+
+```bash
+oc port-forward svc/superset-superset-svc 8088:8088 -n <your-namespace>
+```
+
+Keep this running in its own terminal.
+
+### Step 4: Start the BFF service
+
+The BFF is a separate Node.js server that runs alongside the plugin's webpack dev server. It needs to know the cluster API server URL so it can make Kubernetes API calls with the user's forwarded token, and the Superset URL so it can reach the Superset API.
 
 In a **separate terminal**, from the plugin project root:
 
 ```bash
 cd bff
 npm install   # first time only
-K8S_API_BASE=$(oc whoami --show-server) npm run start:dev
+SUPERSET_URL=http://localhost:8088 K8S_API_BASE=$(oc whoami --show-server) npm run start:dev
 ```
 
-You should see `BFF listening on port 3000`. The `K8S_API_BASE` env var tells the BFF where to find the Kubernetes API server. Without it, the BFF cannot make any cluster calls and all requests will fail with a 502 error.
+You should see `BFF listening on port 3000`.
 
+- `K8S_API_BASE` tells the BFF where to find the Kubernetes API server. Without it, the BFF cannot make any cluster calls and all requests will fail with a 502 error.
+- `SUPERSET_URL` tells the BFF where to reach the Superset API. Without it, the BFF falls back to an OpenShift Route (if one exists) or cluster-internal DNS (which is unreachable from your machine). Set this to `http://localhost:8088` when using `oc port-forward`.
+
+> **Tip:** If your cluster uses a self-signed certificate (common in dev/lab environments), add `K8S_TLS_INSECURE=true` to skip TLS verification for K8s API calls:
+>
+> ```bash
+> K8S_TLS_INSECURE=true SUPERSET_URL=http://localhost:8088 K8S_API_BASE=$(oc whoami --show-server) npm run start:dev
+> ```
+>
+> This is not needed in production — the in-cluster CA bundle mounted from the `kube-root-ca.crt` ConfigMap handles TLS automatically.
+>
 > **Note:** The `proxyService` entry in the `MODULE_FEDERATION_CONFIG` (Step 2) is what tells the dashboard to forward `/apache-superset/api/*` requests to the BFF at `localhost:3000`. If you omit the `proxyService` block, those requests will hit the dashboard's SPA fallback and return HTML instead of JSON.
 
-### Step 4: Start the plugin dev server
+### Step 5: Start the plugin dev server
 
 In another terminal, from the plugin project root:
 
@@ -90,17 +111,18 @@ In another terminal, from the plugin project root:
 npm run start:dev
 ```
 
-### Step 5: Verify
+### Step 6: Verify
 
-You should now have **three processes** running:
+You should now have **four processes** running:
 
 | Process | Port | Purpose |
 |---|---|---|
 | Dashboard container | 8080 | Host application, proxies to plugin and BFF |
-| BFF service | 3000 | Plugin backend (namespace summary aggregation) |
+| `oc port-forward` | 8088 | Forwards Superset service to localhost |
+| BFF service | 3000 | Plugin backend (Superset deployment, status, dashboards, guest tokens) |
 | Plugin dev server | 9500 | Plugin frontend (webpack dev server with HMR) |
 
-Open the dashboard URL in your browser. You should see the RHOAI Dashboard with your plugin loaded in the sidebar, including the Namespace Summary page under the Apache Superset section.
+Open the dashboard URL in your browser. You should see the RHOAI Dashboard with your plugin loaded in the sidebar, with Instance Management and Dashboards pages under the Apache Superset section.
 
 ### How it works
 
@@ -222,21 +244,39 @@ cd frontend
 npm run start:dev
 ```
 
-### Step 8: Start the BFF service
+### Step 8: Port-forward the Superset service
+
+Once Superset is deployed into a namespace (via the Instance Management page), port-forward the service so the BFF can reach the Superset API:
+
+```bash
+oc port-forward svc/superset-superset-svc 8088:8088 -n <your-namespace>
+```
+
+Keep this running in its own terminal.
+
+### Step 9: Start the BFF service
 
 The BFF is a separate Node.js server. In a **separate terminal**, from the plugin project root:
 
 ```bash
 cd bff
 npm install   # first time only
-K8S_API_BASE=$(oc whoami --show-server) npm run start:dev
+SUPERSET_URL=http://localhost:8088 K8S_API_BASE=$(oc whoami --show-server) npm run start:dev
 ```
 
-You should see `BFF listening on port 3000`. The `K8S_API_BASE` env var tells the BFF where to find the Kubernetes API server (required for local dev since the BFF is not running in-cluster).
+You should see `BFF listening on port 3000`. The `K8S_API_BASE` env var tells the BFF where to find the Kubernetes API server (required for local dev since the BFF is not running in-cluster). The `SUPERSET_URL` env var tells the BFF where to reach the Superset API (required for local dev since cluster-internal DNS is not reachable).
 
+> **Tip:** If your cluster uses a self-signed certificate (common in dev/lab environments), add `K8S_TLS_INSECURE=true` to skip TLS verification for K8s API calls:
+>
+> ```bash
+> K8S_TLS_INSECURE=true SUPERSET_URL=http://localhost:8088 K8S_API_BASE=$(oc whoami --show-server) npm run start:dev
+> ```
+>
+> This is not needed in production — the in-cluster CA bundle mounted from the `kube-root-ca.crt` ConfigMap handles TLS automatically.
+>
 > **Note:** The `proxyService` entry in `env.local` (Step 6) tells the dashboard to forward `/apache-superset/api/*` requests to the BFF. Without it, those requests return HTML instead of JSON.
 
-### Step 9: Start the plugin dev server
+### Step 10: Start the plugin dev server
 
 From the plugin project root:
 
@@ -244,7 +284,7 @@ From the plugin project root:
 npm run start:dev
 ```
 
-### Step 10: Verify
+### Step 11: Verify
 
 Open <http://localhost:4010> in your browser. You should see the RHOAI Dashboard with your plugin loaded in the sidebar.
 
@@ -290,11 +330,12 @@ When `localService` is present, the dashboard backend proxies to that host/port 
 Regardless of which method you chose above, the plugin development workflow is the same:
 
 1. Start the dashboard (container or source) -- ensure `MODULE_FEDERATION_CONFIG` includes the `proxyService` entry
-2. Start the BFF service with `cd bff && K8S_API_BASE=$(oc whoami --show-server) npm run start:dev`
-3. Start the plugin dev server with `npm run start:dev`
-4. Open the dashboard URL in your browser
-5. Navigate to the plugin's page in the dashboard sidebar
-6. Edit plugin source files -- changes are picked up automatically with both methods
+2. Port-forward the Superset service with `oc port-forward svc/superset-superset-svc 8088:8088 -n <your-namespace>` (after deploying Superset)
+3. Start the BFF service with `cd bff && SUPERSET_URL=http://localhost:8088 K8S_API_BASE=$(oc whoami --show-server) npm run start:dev`
+4. Start the plugin dev server with `npm run start:dev`
+5. Open the dashboard URL in your browser
+6. Navigate to the plugin's page in the dashboard sidebar
+7. Edit plugin source files -- changes are picked up automatically with both methods
 
 The dev server supports a custom port via the `PORT` environment variable:
 
@@ -307,6 +348,58 @@ PORT=9200 npm run start:dev
 This project defaults to port **9500**. The port only matters if you run multiple plugin dev servers at the same time — each needs a unique port. Otherwise, any free port works. You can override it with the `PORT` environment variable.
 
 > **Note:** The official RHOAI plugins in the dashboard monorepo occupy ports 9100–9111. Community plugins use a different range to avoid any potential collision.
+
+---
+
+## Running a Local Superset Instance
+
+To test the full deploy → embed flow locally without an OpenShift cluster, you can run Superset via Podman/Docker. This is optional — the plugin's Instance Management page deploys Superset into OpenShift namespaces; a local instance is only useful for developing against the Superset REST API and testing dashboard embedding.
+
+### Step 1: Start a local Superset
+
+```bash
+podman run -d --name superset \
+  -p 8088:8088 \
+  -e SUPERSET_SECRET_KEY=local-dev-secret-key \
+  apache/superset:4.1.1
+```
+
+### Step 2: Initialize and create admin user
+
+```bash
+podman exec -it superset superset db upgrade
+podman exec -it superset superset fab create-admin \
+  --username admin \
+  --firstname Admin \
+  --lastname User \
+  --email admin@localhost \
+  --password admin
+podman exec -it superset superset init
+```
+
+### Step 3: Enable embedded dashboards
+
+Create a `superset_config_extra.py` file to enable guest token authentication:
+
+```python
+FEATURE_FLAGS = {
+    "EMBEDDED_SUPERSET": True,
+}
+GUEST_ROLE_NAME = "Gamma"
+GUEST_TOKEN_JWT_SECRET = "local-jwt-secret"
+GUEST_TOKEN_JWT_EXP_SECONDS = 300
+```
+
+Mount it into the container by re-running with `-v ./superset_config_extra.py:/app/pythonpath/superset_config_extra.py:ro`.
+
+### Step 4: Create a test dashboard
+
+Open `http://localhost:8088` in your browser, log in with `admin`/`admin`, and create a dashboard. Note the dashboard UUID (visible in the URL when viewing a dashboard) — you can embed it via the plugin's Dashboards page.
+
+### Notes
+
+- The BFF discovers Superset's URL in this order: (1) `SUPERSET_URL` env var, (2) OpenShift Route, (3) K8s Service DNS. For local development, set `SUPERSET_URL=http://localhost:8088` and use `oc port-forward` to reach the in-cluster Superset. A standalone local Superset (see below) is only for API development.
+- The Superset server image used in production (`quay.io/rh-ai-community-plugins/apache-superset-server`) is a nonroot variant built from `Containerfile.superset` for OpenShift compatibility.
 
 ---
 
@@ -336,14 +429,14 @@ This project defaults to port **9500**. The port only matters if you run multipl
 - Ensure the plugin dev server is running (not just built)
 - Try a hard refresh (Ctrl+Shift+R) if the module cache is stale
 
-### BFF: "Failed to load namespace summary" with HTML parse error
+### BFF: HTML instead of JSON responses
 
 The frontend receives HTML instead of JSON. This means the request to `/apache-superset/api/*` is not being proxied to the BFF and is hitting the SPA fallback instead.
 
 - Ensure your `MODULE_FEDERATION_CONFIG` includes the `proxyService` block (see the config examples above)
 - Restart the dashboard after changing `MODULE_FEDERATION_CONFIG`
 
-### BFF: "Failed to fetch namespace summary: 502"
+### BFF: 502 errors
 
 The dashboard is correctly proxying to the BFF, but the BFF is returning an error.
 

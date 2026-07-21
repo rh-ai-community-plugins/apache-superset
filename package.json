@@ -1,7 +1,7 @@
 {
   "name": "apache-superset",
   "version": "0.1.0",
-  "description": "A reference implementation and scaffold plugin for the RHOAI Dashboard",
+  "description": "RHOAI Dashboard community plugin that deploys Apache Superset on-demand and embeds dashboards inline",
   "private": true,
   "_comment_name": "[PLUGIN-SPECIFIC] package name — change to {your-plugin}",
   "_comment_mf": "[PLUGIN-SPECIFIC] module-federation.name — camelCase, must match webpack and plugin.yaml",
@@ -48,6 +48,7 @@
     "@patternfly/react-core": "^6",
     "@patternfly/react-icons": "^6",
     "@patternfly/react-table": "^6",
+    "@superset-ui/embedded-sdk": "^0.4.0",
     "lodash-es": "^4.18.1",
     "react": "^18",
     "react-dom": "^18",

@@ -125,9 +125,8 @@ API authentication: session cookies or `Authorization: Bearer <token>` from `/ap
 │  │  Superset Plugin (Module Federation)                       │  │
 │  │                                                            │  │
 │  │  Pages:                                                    │  │
-│  │   - Superset Management  — deploy / status / configure     │  │
+│  │   - Instance Management  — deploy / status / teardown      │  │
 │  │   - Embedded Dashboards  — browse & view dashboards inline │  │
-│  │   - Data Connections     — manage warehouse connections    │  │
 │  │                                                            │  │
 │  │  Remote Modules:                                           │  │
 │  │   - ./extensions  (nav items, routes, area)                │  │
@@ -136,7 +135,7 @@ API authentication: session cookies or `Authorization: Bearer <token>` from `/ap
 │             │                                                     │
 │  ┌──────────▼─────────────────────────────────────────────────┐  │
 │  │  BFF Service (Express.js)                                  │  │
-│  │   Port 3000 | Proxied via dashboard at /superset-plugin/api│  │
+│  │   Port 3000 | Proxied via dashboard at /apache-superset/api│  │
 │  │                                                            │  │
 │  │  Endpoints:                                                │  │
 │  │   POST   /api/superset/deploy      — create K8s resources  │  │
@@ -144,7 +143,7 @@ API authentication: session cookies or `Authorization: Bearer <token>` from `/ap
 │  │   GET    /api/superset/status      — health + readiness    │  │
 │  │   GET    /api/superset/guest-token — generate embed token  │  │
 │  │   GET    /api/superset/dashboards  — list available dashb. │  │
-│  │   POST   /api/superset/datasource  — add warehouse conn.  │  │
+│  │   POST   /api/superset/load-examples — load sample data   │  │
 │  │   GET    /api/superset/config      — current instance info │  │
 │  │   GET    /api/health               — BFF health check      │  │
 │  └──────────┬─────────────────────────────────────────────────┘  │
@@ -294,7 +293,7 @@ function SupersetDashboardEmbed({ dashboardId }: { dashboardId: string }) {
       supersetDomain: supersetInstanceUrl,       // e.g. https://superset.apps.cluster.example.com
       mountPoint: mountRef.current,              // DOM element to mount iframe
       fetchGuestToken: () =>
-        fetch('/superset-plugin/api/superset/guest-token?dashboard=' + dashboardId)
+        fetch('/apache-superset/api/superset/guest-token?dashboard=' + dashboardId)
           .then(r => r.json())
           .then(d => d.guestToken),
       dashboardUiConfig: {
@@ -334,7 +333,7 @@ Guest tokens are JWTs that scope access for embedded users:
 - **Resources**: Restrict which dashboards this token can access
 - **RLS (Row-Level Security)**: Filter data rows visible to this user — enables multi-tenant data isolation
 - **Expiration**: Controlled by `GUEST_TOKEN_JWT_EXP_SECONDS` (default 300s / 5 minutes)
-- **Role**: Guest users get the role defined by `GUEST_ROLE_NAME` (default: `"Public"`)
+- **Role**: Guest users get the role defined by `GUEST_ROLE_NAME` (set to `"EmbedGuest"` — a dedicated role auto-provisioned by the init container)
 
 ### CSP / Security Headers Configuration
 
@@ -387,7 +386,7 @@ User (browser)
   ▼
 RHOAI Dashboard
   │
-  │ Proxies /superset-plugin/api/* to BFF
+  │ Proxies /apache-superset/api/* to BFF
   │ Forwards x-forwarded-access-token header
   │
   ▼
@@ -571,7 +570,7 @@ src/app/hooks/
   useSupersetStatus.ts        — health check polling
   useSupersetDashboards.ts    — list dashboards via BFF -> Superset API
   useSupersetGuestToken.ts    — fetch guest tokens for embedding
-  useSupersetDataSources.ts   — manage data warehouse connections
+  useLoadExamples.ts          — trigger load-examples with streaming logs
 ```
 
 ### Dependencies
@@ -637,10 +636,9 @@ BFF Service (port 3000)
 │   - Calls Superset API /api/v1/dashboard/
 │   - Returns: { dashboards: [{ id, title, url, status }] }
 │
-├── POST /api/superset/datasource        — Add data warehouse connection
-│   Body: { engine, host, port, database, username, password }
-│   - Calls Superset API /api/v1/database/
-│   - Tests connectivity before saving
+├── POST /api/superset/load-examples     — Load example data
+│   - Executes `superset load-examples` in the Superset pod via K8s exec WebSocket
+│   - Streams stdout/stderr back to the frontend
 │
 └── GET  /api/superset/config            — Current instance configuration
     - Returns instance URL, mode, version, resource usage
@@ -710,13 +708,13 @@ The RHOAI dashboard proxies BFF requests via the federation ConfigMap:
 ```json
 {
   "proxyService": [{
-    "path": "/superset-plugin/api",
+    "path": "/apache-superset/api",
     "pathRewrite": "/api",
     "authorize": true,
     "tls": false,
     "service": {
-      "name": "superset-plugin-bff",
-      "namespace": "superset-plugin",
+      "name": "apache-superset-bff",
+      "namespace": "apache-superset",
       "port": 3000
     }
   }]
@@ -876,8 +874,8 @@ superset:
   postgres:
     enabled: true
     image:
-      repository: bitnami/postgresql
-      tag: "16"
+      repository: registry.redhat.io/rhel9/postgresql-16
+      tag: "latest"
     persistence:
       size: 5Gi
       storageClass: ""   # Use cluster default
@@ -994,11 +992,12 @@ This requires cluster-admin privileges, which may not be available to plugin use
 
 ### PostgreSQL on OpenShift
 
-The Bitnami PostgreSQL image generally works with OpenShift:
+The sub-chart uses `registry.redhat.io/rhel9/postgresql-16`, Red Hat's official PostgreSQL image. This image is purpose-built for OpenShift:
 
-- Runs as non-root (UID 1001) by default
-- Uses `securityContext.runAsUser: 1001` in the chart
-- PVC permissions may need adjustment via `volumePermissions.enabled: true`
+- Runs as non-root and supports random UIDs (compatible with the `restricted` SCC out of the box)
+- Uses Red Hat-specific environment variable names: `POSTGRESQL_USER`, `POSTGRESQL_PASSWORD`, `POSTGRESQL_DATABASE` (not the upstream `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` convention used by the Docker Hub image)
+- Data directory is `/var/lib/pgsql/data` (not `/var/lib/postgresql/data`)
+- Readiness/liveness probes use `/usr/libexec/check-container` (provided by the image), not a generic `pg_isready` command
 
 ---
 
@@ -1024,7 +1023,7 @@ FEATURE_FLAGS = {
     "ALERT_REPORTS": False,          # Disable if no Celery
 }
 
-GUEST_ROLE_NAME = "Public"
+GUEST_ROLE_NAME = "EmbedGuest"
 GUEST_TOKEN_JWT_SECRET = os.environ.get("SUPERSET_GUEST_TOKEN_JWT_SECRET", SECRET_KEY)
 GUEST_TOKEN_JWT_EXP_SECONDS = int(os.environ.get("SUPERSET_GUEST_TOKEN_JWT_EXP_SECONDS", "300"))
 
@@ -1144,9 +1143,9 @@ module.exports = merge(common, {
     port: 9500,
     proxy: [
       {
-        context: ['/superset-plugin/api'],
+        context: ['/apache-superset/api'],
         target: 'http://localhost:3000',
-        pathRewrite: { '^/superset-plugin/api': '/api' },
+        pathRewrite: { '^/apache-superset/api': '/api' },
       },
       {
         context: ['/superset-plugin'],
@@ -1216,7 +1215,7 @@ A feasibility analysis was conducted on five tools. Full findings are summarized
 - **License**: Apache 2.0 — fully permissive, zero legal risk
 - **Embedding**: React SDK (`@superset-ui/embedded-sdk`), guest tokens, row-level security — all free in OSS
 - **Auth**: Guest tokens via API, optional OIDC for full UI access
-- **OpenShift**: Nonroot variants available, Bitnami PostgreSQL works with restricted SCC
+- **OpenShift**: Nonroot variants available, Red Hat PostgreSQL (`registry.redhat.io/rhel9/postgresql-16`) works with restricted SCC
 - **Deployment**: 2 pods minimum (lightweight mode), 5 pods full mode. Official Helm chart.
 - **Project health**: Apache Foundation governance, very active development, large community
 - **Verdict**: Best overall. Selected for implementation.

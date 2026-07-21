@@ -1,0 +1,22 @@
+.superset-embed-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.superset-embed-layout > section:last-child {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.superset-embed-container {
+  height: 100%;
+}
+
+.superset-embed-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}

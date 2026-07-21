@@ -23,16 +23,19 @@ Usage: $(basename "$0") [TARGET] [VERSION]
 Build and push container images to Quay.io.
 
 Arguments:
-  TARGET    Which image to build: frontend, bff, or all (default: all)
-  VERSION   Version tag for the images (e.g. 0.5.0, 0.5.0-rc1). If omitted,
-            the next minor version is computed from existing git tags and you
-            are prompted to confirm before proceeding.
+  TARGET    Which image to build: frontend, bff, superset, or all (default: all)
+  VERSION   Version tag for frontend and BFF images (e.g. 0.5.0, 0.5.0-rc1).
+            If omitted, the next minor version is computed from existing git
+            tags and you are prompted to confirm before proceeding.
+            The superset target always uses the upstream Superset version from
+            Containerfile.superset (currently $(sed -nE 's/^FROM\s+.*superset:([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' Containerfile.superset)), ignoring VERSION.
 
 Examples:
-  $(basename "$0")                  # Build+push both, auto-version with confirmation
+  $(basename "$0")                  # Build+push all, auto-version with confirmation
   $(basename "$0") frontend         # Build+push frontend only, auto-version
   $(basename "$0") bff 0.5.0-rc1    # Build+push BFF with explicit version
-  $(basename "$0") all 0.5.0        # Build+push both with explicit version
+  $(basename "$0") superset         # Build+push Superset server (always tagged with upstream version)
+  $(basename "$0") all 0.5.0        # Build+push all (frontend+BFF use 0.5.0, superset uses upstream version)
 EOF
 }
 
@@ -43,7 +46,18 @@ frontend_context="."
 
 bff_image_name="apache-superset-bff"
 bff_containerfile="bff/Containerfile"
-bff_context="bff/"
+bff_context="."
+
+superset_image_name="apache-superset-server"
+superset_containerfile="Containerfile.superset"
+superset_context="."
+
+# Extract the Superset upstream version from the Containerfile base image tag.
+# The Superset server image is tagged with this version (not the plugin version)
+# so that the Helm sub-chart's appVersion resolves to a matching image.
+get_superset_version() {
+    sed -nE 's/^FROM\s+.*superset:([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' "${superset_containerfile}"
+}
 
 # Get the next semantic version tag
 get_next_version() {
@@ -103,11 +117,11 @@ check_prerequisites() {
 
     for target in "${targets[@]}"; do
         local containerfile
-        if [[ "${target}" == "frontend" ]]; then
-            containerfile="${frontend_containerfile}"
-        else
-            containerfile="${bff_containerfile}"
-        fi
+        case "${target}" in
+            frontend)  containerfile="${frontend_containerfile}" ;;
+            bff)       containerfile="${bff_containerfile}" ;;
+            superset)  containerfile="${superset_containerfile}" ;;
+        esac
 
         if [[ ! -f "${containerfile}" ]]; then
             log_error "Containerfile not found: ${containerfile}"
@@ -126,14 +140,31 @@ process_target() {
     local version="$2"
     local image_name containerfile context
 
-    if [[ "${target}" == "frontend" ]]; then
-        image_name="${frontend_image_name}"
-        containerfile="${frontend_containerfile}"
-        context="${frontend_context}"
-    else
-        image_name="${bff_image_name}"
-        containerfile="${bff_containerfile}"
-        context="${bff_context}"
+    case "${target}" in
+        frontend)
+            image_name="${frontend_image_name}"
+            containerfile="${frontend_containerfile}"
+            context="${frontend_context}"
+            ;;
+        bff)
+            image_name="${bff_image_name}"
+            containerfile="${bff_containerfile}"
+            context="${bff_context}"
+            ;;
+        superset)
+            image_name="${superset_image_name}"
+            containerfile="${superset_containerfile}"
+            context="${superset_context}"
+            ;;
+    esac
+
+    # Superset server image uses the upstream Superset version, not the plugin version
+    if [[ "${target}" == "superset" ]]; then
+        version=$(get_superset_version)
+        if [[ -z "${version}" ]]; then
+            log_error "Could not extract Superset version from ${superset_containerfile}"
+            exit 1
+        fi
     fi
 
     local full_image="${REGISTRY}/${image_name}:${version}"
@@ -161,7 +192,7 @@ main() {
     fi
 
     case "${target}" in
-        frontend|bff|all) ;;
+        frontend|bff|superset|all) ;;
         *)
             log_error "Unknown target: ${target}"
             usage
@@ -169,7 +200,7 @@ main() {
             ;;
     esac
 
-    if [[ -z "${version}" ]]; then
+    if [[ -z "${version}" && "${target}" != "superset" ]]; then
         version=$(get_next_version)
         echo ""
         log_info "Proposed version: ${version}"
@@ -182,7 +213,7 @@ main() {
 
     local targets=()
     if [[ "${target}" == "all" ]]; then
-        targets=("frontend" "bff")
+        targets=("frontend" "bff" "superset")
     else
         targets=("${target}")
     fi
@@ -209,11 +240,11 @@ main() {
     log_success "Done! Images pushed for version ${version}:"
     for t in "${targets[@]}"; do
         local image_name
-        if [[ "${t}" == "frontend" ]]; then
-            image_name="${frontend_image_name}"
-        else
-            image_name="${bff_image_name}"
-        fi
+        case "${t}" in
+            frontend)  image_name="${frontend_image_name}" ;;
+            bff)       image_name="${bff_image_name}" ;;
+            superset)  image_name="${superset_image_name}" ;;
+        esac
         log_success "  ${REGISTRY}/${image_name}:${version}"
     done
 }

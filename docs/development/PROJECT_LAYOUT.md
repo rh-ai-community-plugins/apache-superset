@@ -15,19 +15,28 @@ Directory structure of the plugin.
 │       ├── components/             #   Shared UI components
 │       │   ├── CommunityBanner.tsx  #     [SHARED] "Community Plugin" banner — do not modify
 │       │   ├── CommunityBanner.css  #     [SHARED] Banner styles — do not modify
-│       │   ├── ApacheSupersetNavIcon.tsx#     [PLUGIN-SPECIFIC] Your plugin's sidebar icon
-│       │   └── ProjectSelector.tsx #     Project selector with fuzzy search and favorites
+│       │   ├── ApacheSupersetNavIcon.tsx #    [PLUGIN-SPECIFIC] Your plugin's sidebar icon
+│       │   ├── ProjectSelector.tsx  #    Project selector with fuzzy search and favorites
+│       │   ├── DeployForm.tsx       #    Superset deploy form with namespace + RBAC check
+│       │   ├── DeploymentStatusCard.tsx # Running instance status card
+│       │   ├── DashboardList.tsx     #    Paginated dashboard list with embed buttons
+│       │   ├── SupersetDashboardEmbed.tsx # Embedded dashboard iframe wrapper
+│       │   ├── LoadExamplesModal.tsx #    Modal with streaming log output for load-examples
+│       │   └── EmbedErrorBoundary.tsx #  Error boundary for embedded dashboard iframes
 │       ├── pages/                  #   One file per page/route
-│       │   ├── UserInfoPage.tsx    #     Uses dashboard API pattern (/api/status)
-│       │   ├── ClusterResourcesPage.tsx  # Uses K8s API pass-through (/api/k8s/*)
-│       │   └── NamespaceSummaryPage.tsx  # Uses BFF pattern (plugin's own backend)
+│       │   ├── InstanceManagementPage.tsx  # Deploy, monitor, and manage the Superset instance
+│       │   └── EmbeddedDashboardsPage.tsx  # Browse and embed Superset dashboards inline
 │       └── hooks/                  #   Data-fetching hooks
 │           ├── useCurrentUser.ts   #     Dashboard API
 │           ├── useProjects.ts      #     K8s API
 │           ├── useFavoriteProjects.ts  # localStorage-backed project favorites
-│           ├── useK8sResources.ts  #     K8s API (generic CRUD)
+│           ├── useLastSelectedProject.ts # localStorage-backed last selected project
 │           ├── useAccessReview.ts  #     RBAC check via SelfSubjectAccessReview
-│           └── useNamespaceSummary.ts  # BFF call
+│           ├── useSupersetDeployment.ts # Deploy and teardown via BFF
+│           ├── useSupersetStatus.ts #    Adaptive-interval status polling
+│           ├── useSupersetDashboards.ts # Dashboard list fetching
+│           ├── useSupersetGuestToken.ts # Guest token callback for embedding
+│           └── useLoadExamples.ts  #     Trigger load-examples with streaming logs
 ├── config/                          # Webpack configs
 │   ├── webpack.common.js            #   Module Federation setup, loaders, path alias (~ → src)
 │   ├── webpack.dev.js               #   Dev server (port 9500), proxy rules
@@ -35,7 +44,7 @@ Directory structure of the plugin.
 ├── bff/                             # Backend-For-Frontend service (optional — only if using BFF pattern)
 │   └── src/
 │       ├── server.ts                #   Express server entry
-│       ├── types.ts                 #   Shared types (PodCounts, NamespaceInfo)
+│       ├── types.ts                 #   Shared types (K8sResource, K8sList)
 │       ├── routes/                  #   API route handlers
 │       └── utils/                   #   K8s client helpers
 ├── chart/                           # Helm chart for OpenShift deployment

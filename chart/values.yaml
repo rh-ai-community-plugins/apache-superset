@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 
 image:
-  repository: quay.io/OWNER/apache-superset
+  repository: quay.io/rh-ai-community-plugins/apache-superset
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -51,13 +51,73 @@ tolerations: []
 
 affinity: {}
 
+# Superset instance (deployed on-demand per namespace)
+superset:
+  enabled: false
+  image:
+    repository: quay.io/rh-ai-community-plugins/apache-superset-server
+    tag: ""
+  port: 8088
+  admin:
+    username: admin
+    password: ""
+    firstName: Superset
+    lastName: Admin
+    email: admin@superset.local
+  embedding:
+    enabled: true
+    guestTokenJwtSecret: ""
+    guestTokenExpSeconds: 300
+    allowedOrigins: ""
+  secretKey: ""
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  postgres:
+    image:
+      repository: registry.redhat.io/rhel9/postgresql-16
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    password: ""
+    database: superset
+    user: superset
+    persistence:
+      size: 5Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  tls:
+    forceHttps: "false"
+  route:
+    enabled: false
+    host: ""
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  securityContext:
+    runAsNonRoot: true
+
 # BFF (Backend For Frontend) service
 bff:
   enabled: true
   image:
-    repository: quay.io/OWNER/apache-superset-bff
+    repository: quay.io/rh-ai-community-plugins/apache-superset-bff
     tag: ""
     pullPolicy: IfNotPresent
+  chartDir: /opt/app-root/src/chart-templates/superset
   replicaCount: 1
   service:
     type: ClusterIP

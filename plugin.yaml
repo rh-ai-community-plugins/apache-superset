@@ -1,13 +1,13 @@
 # --- Plugin identity (required) ---
 name: apache-superset                    # [PLUGIN-SPECIFIC] unique plugin identifier (kebab-case)
 displayName: Apache Superset             # [PLUGIN-SPECIFIC] human-readable name
-description: A reference implementation and scaffold plugin for the RHOAI Dashboard
+description: Community plugin that deploys Apache Superset on-demand and embeds dashboards inline within the RHOAI Dashboard
 version: 0.1.0
 
 # --- Maintainer (required) ---
 maintainer:                          # [PLUGIN-SPECIFIC]
-  name: Your Name                    # [PLUGIN-SPECIFIC] replace with maintainer's name
-  github: your-github-handle        # [PLUGIN-SPECIFIC] replace with maintainer's GitHub handle
+  name: Guillaume Moutier                    # [PLUGIN-SPECIFIC] replace with maintainer's name
+  github: guimou        # [PLUGIN-SPECIFIC] replace with maintainer's GitHub handle
 
 # --- RHOAI compatibility (required) ---
 rhoai_compatibility:                 # [PLUGIN-SPECIFIC]
@@ -18,11 +18,11 @@ rhoai_compatibility:                 # [PLUGIN-SPECIFIC]
 deployment_model: cluster-shared     # per-project | cluster-shared | both
 
 image:                               # [PLUGIN-SPECIFIC]
-  repository: quay.io/OWNER/apache-superset
+  repository: quay.io/rh-ai-community-plugins/apache-superset
   tag: "0.1.0"
 
 bff_image:                           # [PLUGIN-SPECIFIC] (optional — only if using BFF pattern)
-  repository: quay.io/OWNER/apache-superset-bff
+  repository: quay.io/rh-ai-community-plugins/apache-superset-bff
   tag: "0.1.0"
 
 # --- Installation (required) ---
@@ -30,7 +30,7 @@ install:
   method: automatic                  # automatic | assisted | manual
   helm:
     chart_path: chart/
-    registry: oci://quay.io/OWNER/apache-superset-chart  # [PLUGIN-SPECIFIC]
+    registry: oci://quay.io/rh-ai-community-plugins/apache-superset-chart  # [PLUGIN-SPECIFIC]
   prerequisites: []
   instructions: https://github.com/rh-ai-community-plugins/apache-superset/blob/main/docs/deployment  # [PLUGIN-SPECIFIC]
 
@@ -53,12 +53,24 @@ remote:
         path: apacheSuperset/Icon         # [PLUGIN-SPECIFIC] {scope}/Icon
 
 # --- RBAC (required) ---
-# NOTE: The plugin itself requires no cluster roles at install time. However,
-# users of the Cluster Resources page need RBAC permissions for create/list/delete
-# on apps/deployments, core/services, core/configmaps, and core/secrets via the
-# dashboard's K8s API pass-through.
+# The plugin itself requires no cluster roles at install time. However, users
+# who deploy Superset instances need namespace-scoped RBAC permissions for
+# create/get/list/update/delete on the following resources (via the BFF's K8s API calls):
+#   - apps/deployments
+#   - core/services, core/configmaps, core/secrets, core/persistentvolumeclaims
+#   - core/serviceaccounts
+#   - route.openshift.io/routes
 rbac:
-  required_roles: []
+  required_roles:
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["create", "get", "list", "update", "delete"]
+    - apiGroups: [""]
+      resources: ["services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
+      verbs: ["create", "get", "list", "update", "delete"]
+    - apiGroups: ["route.openshift.io"]
+      resources: ["routes"]
+      verbs: ["create", "get", "list", "update", "delete"]
   cluster_roles: false
 
 # --- Support (optional) ---

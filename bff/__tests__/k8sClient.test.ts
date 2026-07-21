@@ -1,8 +1,11 @@
 import https from 'https';
 import { EventEmitter } from 'events';
-import { k8sRequest, getK8sBaseUrl } from '../src/utils/k8sClient';
+import { k8sRequest, getK8sBaseUrl, K8sApiError } from '../src/utils/k8sClient';
 
 jest.mock('https');
+jest.mock('http', () => ({
+  request: jest.fn(),
+}));
 
 const mockedHttps = jest.mocked(https);
 
@@ -62,6 +65,7 @@ describe('k8sRequest', () => {
   it('sends Authorization header with the token', async () => {
     const mockReq = new EventEmitter() as any;
     mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
 
     mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
       callback(createMockResponse(200, '{"items":[]}'));
@@ -77,6 +81,7 @@ describe('k8sRequest', () => {
   it('constructs the correct URL path', async () => {
     const mockReq = new EventEmitter() as any;
     mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
 
     mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
       callback(createMockResponse(200, '{}'));
@@ -91,23 +96,31 @@ describe('k8sRequest', () => {
     expect(callArgs.path).toBe('/apis/project.openshift.io/v1/projects');
   });
 
-  it('rejects on non-2xx responses', async () => {
+  it('rejects on non-2xx responses with K8sApiError', async () => {
     const mockReq = new EventEmitter() as any;
     mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
 
+    const rawBody = '{"message":"forbidden","reason":"Forbidden"}';
     mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
-      callback(createMockResponse(403, '{"message":"forbidden"}'));
+      callback(createMockResponse(403, rawBody));
       return mockReq;
     });
 
-    await expect(k8sRequest('bad-token', '/api/v1/pods')).rejects.toThrow(
-      'K8s API returned 403',
-    );
+    const err = await k8sRequest('bad-token', '/api/v1/pods').catch((e) => e);
+    expect(err).toBeInstanceOf(K8sApiError);
+    expect((err as K8sApiError).statusCode).toBe(403);
+    // Raw body must be stored for programmatic server-side use
+    expect((err as K8sApiError).body).toBe(rawBody);
+    // But the message must NOT include the raw body (it would leak to clients)
+    expect((err as K8sApiError).message).not.toContain(rawBody);
+    expect((err as K8sApiError).message).toBe('K8s API returned 403');
   });
 
   it('rejects on request error', async () => {
     const mockReq = new EventEmitter() as any;
     mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
 
     mockedHttps.request.mockImplementation(() => {
       process.nextTick(() => mockReq.emit('error', new Error('ECONNREFUSED')));
@@ -117,5 +130,86 @@ describe('k8sRequest', () => {
     await expect(k8sRequest('token', '/api/v1/pods')).rejects.toThrow(
       'ECONNREFUSED',
     );
+  });
+
+  it('uses POST method and sends body when specified', async () => {
+    const mockReq = new EventEmitter() as any;
+    mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
+
+    mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
+      callback(createMockResponse(201, '{"metadata":{"name":"test"}}'));
+      return mockReq;
+    });
+
+    const body = { apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: 'test' } };
+    await k8sRequest('token', '/api/v1/namespaces/default/configmaps', {
+      method: 'POST',
+      body,
+    });
+
+    const callArgs = mockedHttps.request.mock.calls[0][0] as any;
+    expect(callArgs.method).toBe('POST');
+    expect(callArgs.headers['Content-Type']).toBe('application/json');
+    expect(mockReq.write).toHaveBeenCalledWith(JSON.stringify(body));
+  });
+
+  it('uses PUT method when specified', async () => {
+    const mockReq = new EventEmitter() as any;
+    mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
+
+    mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
+      callback(createMockResponse(200, '{}'));
+      return mockReq;
+    });
+
+    await k8sRequest('token', '/api/v1/namespaces/default/configmaps/test', {
+      method: 'PUT',
+      body: { metadata: { name: 'test' } },
+    });
+
+    const callArgs = mockedHttps.request.mock.calls[0][0] as any;
+    expect(callArgs.method).toBe('PUT');
+  });
+
+  it('uses DELETE method when specified', async () => {
+    const mockReq = new EventEmitter() as any;
+    mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
+
+    mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
+      callback(createMockResponse(200, '{}'));
+      return mockReq;
+    });
+
+    await k8sRequest('token', '/api/v1/namespaces/default/configmaps/test', {
+      method: 'DELETE',
+    });
+
+    const callArgs = mockedHttps.request.mock.calls[0][0] as any;
+    expect(callArgs.method).toBe('DELETE');
+  });
+
+  it('resolves undefined for empty response body', async () => {
+    const mockReq = new EventEmitter() as any;
+    mockReq.end = jest.fn();
+    mockReq.write = jest.fn();
+
+    const res = new EventEmitter() as any;
+    res.statusCode = 204;
+    process.nextTick(() => {
+      res.emit('end');
+    });
+
+    mockedHttps.request.mockImplementation((_opts: any, callback: any) => {
+      callback(res);
+      return mockReq;
+    });
+
+    const result = await k8sRequest('token', '/api/v1/namespaces/default/configmaps/test', {
+      method: 'DELETE',
+    });
+    expect(result).toBeUndefined();
   });
 });
