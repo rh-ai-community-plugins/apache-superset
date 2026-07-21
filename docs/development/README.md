@@ -10,3 +10,4 @@ Guides for setting up a local development environment and working with the dashb
 - [CUSTOMIZATION.md](CUSTOMIZATION.md) -- Lists the required and optional deliverables (container images, Helm chart, plugin.yaml), their naming conventions, and how to rename identifiers.
 - [BUILD_AND_PUSH.md](BUILD_AND_PUSH.md) -- Building and pushing container images (frontend and BFF) to Quay.io, scanning for vulnerabilities with Trivy, and the CI build workflow. Also covers the Makefile that wraps all common build tasks.
 - [TESTING.md](TESTING.md) -- Manual integration test plan with end-to-end scenarios, RBAC verification, error handling, and instructions for running automated tests.
+- [BEST_PRACTICES.md](BEST_PRACTICES.md) -- Common pitfalls and development patterns for BFF endpoints, React hooks, Helm charts, security, and cross-component contracts. Includes a pre-PR checklist.

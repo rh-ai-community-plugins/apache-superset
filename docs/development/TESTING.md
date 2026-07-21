@@ -27,6 +27,17 @@ npm run lint
 cd bff && npm run lint
 ```
 
+## Contract Testing Principles
+
+Unit tests verify each component in isolation, but many bugs only surface when components connect. Before marking a feature complete, verify these cross-component contracts:
+
+- **Label selectors**: Teardown and status-check code must use the same label selectors that Helm templates render. Write a test that renders the templates and asserts the selector matches.
+- **API response shapes**: If the BFF returns `{ items, count, page }`, assert that shape in both the BFF route test and the frontend hook test. A bare array vs. a pagination wrapper is a common mismatch.
+- **Status/phase enums**: If the BFF defines phases (`not-deployed`, `deploying`, `running`, `error`), the frontend must handle all values. Avoid magic string comparisons — use a shared type or constant.
+- **Auth token forwarding**: Verify end-to-end that the dashboard's `proxyService` config includes `authorize: true` and that the BFF correctly extracts and uses the forwarded Bearer token.
+
+See [BEST_PRACTICES.md](BEST_PRACTICES.md) for the full development checklist, including BFF endpoint patterns, React hook pitfalls, Helm template gotchas, and security guidance.
+
 ## Test Scenarios
 
 ### 1. Full Lifecycle (Happy Path)

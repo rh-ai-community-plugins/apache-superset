@@ -156,6 +156,16 @@ docs/deployment/     — OpenShift deployment with Helm and dashboard registrati
 docs/project/        — Implementation project plan (historical reference)
 ```
 
+## Development Best Practices
+
+`docs/development/BEST_PRACTICES.md` contains patterns and a pre-PR checklist derived from post-implementation fixes. Key rules:
+
+- **BFF routes**: Use runtime auth guards (never `req.token!`), validate all inputs at boundaries, sanitize K8s error bodies before returning to clients, add `.catch()` to every promise chain, include pagination metadata on list endpoints.
+- **React hooks**: Cleanup must use `ref.current` not closure-captured variables; key error boundaries by navigation params; keep `aria-live` regions narrow; add `screenreaderText` to Skeleton components.
+- **Helm templates**: Cast numeric values with `| int`; test `trunc` length with max-length release names; add `helm.sh/resource-policy: keep` to stateful resources (PVCs, Secrets); ensure label selectors in code match rendered template labels.
+- **Security**: Validate paths with `startsWith()` on resolved paths (never `includes()`); validate CORS port ranges; never expose raw internal error bodies.
+- **Cross-component contracts**: Test label selectors against rendered Helm output; assert API response shapes in both producer and consumer tests; handle status/phase enums exhaustively in the frontend.
+
 ## Key Conventions
 
 - Path alias: `~` maps to `./src` (webpack) and `@` maps to `./src` (jest). Use `~` in source code imports.
