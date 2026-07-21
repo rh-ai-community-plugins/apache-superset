@@ -62,15 +62,9 @@ remote:
 #   - route.openshift.io/routes
 rbac:
   required_roles:
-    - apiGroups: ["apps"]
-      resources: ["deployments"]
-      verbs: ["create", "get", "list", "update", "delete"]
-    - apiGroups: [""]
-      resources: ["services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
-      verbs: ["create", "get", "list", "update", "delete"]
-    - apiGroups: ["route.openshift.io"]
-      resources: ["routes"]
-      verbs: ["create", "get", "list", "update", "delete"]
+    - "apps/deployments: create, get, list, update, delete"
+    - "core/services, configmaps, secrets, pvcs, serviceaccounts: create, get, list, update, delete"
+    - "route.openshift.io/routes: create, get, list, update, delete"
   cluster_roles: false
 
 # --- Support (optional) ---
